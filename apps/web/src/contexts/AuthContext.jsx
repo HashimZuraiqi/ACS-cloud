@@ -60,9 +60,22 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
   };
 
+  const loginDemo = () => {
+    setCurrentUser({
+      id: "demo",
+      email: "demo@example.com",
+      name: "Demo User",
+      collectionId: "demo",
+      collectionName: "users",
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      avatar: "",
+    });
+  };
+
   const value = {
-    currentUser, login, signup, logout,
-    isAuthenticated: !!currentUser && pb.authStore.isValid,
+    currentUser, login, signup, logout, loginDemo,
+    isAuthenticated: !!currentUser,
     isLoading
   };
 

@@ -11,76 +11,92 @@ const BucketTable = ({ buckets }) => {
 
   if (!buckets || buckets.length === 0) {
     return (
-      <div className="text-center py-16 rounded-2xl border-2 border-dashed border-border bg-card/40">
-        <ShieldAlert className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-        <h3 className="text-base font-semibold text-foreground">No Buckets Scanned Yet</h3>
-        <p className="text-sm text-muted-foreground mt-1">Use the search bar above to scan an S3 bucket</p>
+      <div className="flex flex-col items-center justify-center text-center py-20 px-4">
+        <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
+          <ShieldAlert className="w-10 h-10 text-muted-foreground/50" />
+        </div>
+        <h3 className="text-xl font-semibold text-foreground mb-2">No Buckets Scanned Yet</h3>
+        <p className="text-muted-foreground max-w-sm mx-auto">
+          Your infrastructure inventory is empty. Use the search bar above to scan your first S3 bucket.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="px-5 py-3.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bucket</th>
-              <th className="px-5 py-3.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Risk</th>
-              <th className="px-5 py-3.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-40">Score</th>
-              <th className="px-5 py-3.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-              <th className="px-5 py-3.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scanned</th>
-              <th className="px-5 py-3.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {buckets.map((bucket) => (
-              <tr
-                key={bucket.scanId || bucket.id}
-                className="group hover:bg-muted/30 transition-colors cursor-pointer"
-                onClick={() => navigate(`/bucket/${bucket.scanId}`)}
-              >
-                <td className="px-5 py-4">
-                  <span className="font-medium text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {bucket.bucketName || bucket.name}
-                  </span>
-                </td>
-                <td className="px-5 py-4">
-                  <RiskBadge riskScore={bucket.riskScore} riskLevel={bucket.riskLevel} />
-                </td>
-                <td className="px-5 py-4">
-                  <RiskScoreBar score={bucket.riskScore} showLabel={false} className="max-w-[140px]" />
-                </td>
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-1.5">
-                    {bucket.status === 'compliant' ? (
-                      <><ShieldCheck className="w-4 h-4 text-emerald-500" /><span className="text-emerald-600 dark:text-emerald-400 font-medium text-xs">Compliant</span></>
-                    ) : (
-                      <><ShieldAlert className={cn("w-4 h-4", bucket.status === 'non-compliant' ? "text-red-500" : "text-amber-500")} /><span className="capitalize font-medium text-xs text-foreground">{bucket.status?.replace('-', ' ') || bucket.complianceStatus}</span></>
-                    )}
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-muted-foreground text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    {new Date(bucket.timestamp || bucket.lastScanned).toLocaleDateString()}
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-right">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); navigate(`/bucket/${bucket.scanId}`); }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/[0.08] hover:bg-blue-500/[0.15] transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    Details
-                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-white/10 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <th className="px-6 py-4 pl-8">Bucket Name</th>
+            <th className="px-6 py-4">Risk Level</th>
+            <th className="px-6 py-4 w-48">Security Score</th>
+            <th className="px-6 py-4">Compliance</th>
+            <th className="px-6 py-4">Last Scanned</th>
+            <th className="px-6 py-4 text-right pr-8">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {buckets.map((bucket, index) => (
+            <motion.tr
+              key={bucket.scanId || bucket.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 + 0.2 }}
+              className="group hover:bg-white/[0.03] transition-colors cursor-pointer"
+              onClick={() => navigate(`/bucket/${bucket.scanId}`)}
+            >
+              <td className="px-6 py-5 pl-8">
+                <span className="font-semibold text-foreground group-hover:text-blue-400 transition-colors text-base block mb-0.5">
+                  {bucket.bucketName || bucket.name}
+                </span>
+                <span className="text-xs text-muted-foreground">{bucket.region || 'us-east-1'}</span>
+              </td>
+              <td className="px-6 py-5">
+                <RiskBadge riskScore={bucket.riskScore} riskLevel={bucket.riskLevel} />
+              </td>
+              <td className="px-6 py-5">
+                <RiskScoreBar score={bucket.riskScore} showLabel={false} className="max-w-[140px]" />
+              </td>
+              <td className="px-6 py-5">
+                <div className="flex items-center gap-2">
+                  {bucket.status === 'compliant' ? (
+                    <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span className="font-medium text-xs">Compliant</span>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "flex items-center gap-2 px-2.5 py-1 rounded-full border",
+                      bucket.status === 'non-compliant'
+                        ? "bg-red-500/10 text-red-500 border-red-500/20"
+                        : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                    )}>
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span className="capitalize font-medium text-xs">{bucket.status?.replace('-', ' ') || bucket.complianceStatus}</span>
+                    </div>
+                  )}
+                </div>
+              </td>
+              <td className="px-6 py-5 text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 opacity-70" />
+                  {new Date(bucket.timestamp || bucket.lastScanned).toLocaleDateString()}
+                </div>
+              </td>
+              <td className="px-6 py-5 text-right pr-8">
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate(`/bucket/${bucket.scanId}`); }}
+                  className="group/btn relative inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 hover:text-blue-300 transition-all active:scale-95"
+                >
+                  View Report
+                  <ArrowRight className="w-3 h-3 transition-transform group-hover/btn:translate-x-0.5" />
+                </button>
+              </td>
+            </motion.tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };

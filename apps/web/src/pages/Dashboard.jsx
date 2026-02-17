@@ -4,25 +4,50 @@ import { getResults, scanBucket } from '@/lib/api';
 import BucketTable from '@/components/BucketTable.jsx';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const ease = [0.22, 1, 0.36, 1];
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.45, delay: i * 0.08, ease: [0.25,0.46,0.45,0.94] } }),
+  hidden: { opacity: 0, y: 30 },
+  visible: (i = 0) => ({
+    opacity: 1, y: 0,
+    transition: { duration: 0.8, delay: i * 0.1, ease },
+  }),
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: (i = 0) => ({
+    opacity: 1, scale: 1,
+    transition: { duration: 0.6, delay: i * 0.05, ease },
+  }),
 };
 
 const StatCard = ({ icon: Icon, label, value, accent, delay }) => (
   <motion.div
-    initial="hidden" animate="visible" variants={fadeUp} custom={delay}
-    className="group relative p-5 rounded-2xl border border-border bg-card hover:shadow-lg hover:shadow-black/[0.03] dark:hover:shadow-black/20 transition-all duration-300"
+    initial="hidden" animate="visible" variants={scaleIn} custom={delay}
+    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+    className="group relative p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-xl hover:bg-white/10 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 overflow-hidden"
   >
-    <div className="flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${accent} transition-transform group-hover:scale-110`}>
-        <Icon className="w-5 h-5 text-white" />
+    <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full ${accent} opacity-[0.15] blur-2xl group-hover:opacity-25 transition-opacity duration-500`} />
+
+    <div className="relative flex items-center gap-4">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${accent} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform duration-300`}>
+        <Icon className="w-6 h-6 text-white" />
       </div>
       <div>
-        <p className="text-sm text-muted-foreground font-medium">{label}</p>
-        <p className="text-2xl font-bold text-foreground mt-0.5">{value}</p>
+        <p className="text-sm text-muted-foreground font-medium mb-1">{label}</p>
+        <div className="flex items-baseline gap-2">
+          <motion.p
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: delay * 0.2 + 0.5 }}
+            className="text-3xl font-bold text-foreground"
+          >
+            {value}
+          </motion.p>
+        </div>
       </div>
     </div>
   </motion.div>
@@ -62,62 +87,82 @@ const Dashboard = () => {
   const compliant = buckets.filter(b => b.status === 'compliant').length;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Security Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Monitor and protect your S3 bucket infrastructure</p>
-      </motion.div>
+    <div className="relative min-h-[calc(100vh-4rem)]">
+      <div className="space-y-8 pb-10">
+        {/* Header */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-2">
+            <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-400 dark:from-blue-400 dark:via-cyan-300 dark:to-blue-300 bg-clip-text text-transparent">
+              Security Dashboard
+            </span>
+          </h1>
+          <p className="text-lg text-muted-foreground">Real-time infrastructure monitoring and compliance analysis.</p>
+        </motion.div>
 
-      {/* Scan bar */}
-      <motion.form onSubmit={handleScan} initial="hidden" animate="visible" variants={fadeUp} custom={1}>
-        <div className="flex flex-col sm:flex-row gap-3 p-1.5 sm:p-1.5 bg-card rounded-2xl border border-border">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text" placeholder="Enter S3 bucket name to scan..." value={searchQuery}
-              onChange={(e)=>setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all text-sm"
-            />
+        {/* Scan bar */}
+        <motion.form onSubmit={handleScan} initial="hidden" animate="visible" variants={fadeUp} custom={1}
+          className="max-w-2xl"
+        >
+          <div className="relative group p-[2px] rounded-2xl bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-blue-500/20 hover:from-blue-500/40 hover:via-cyan-500/40 hover:to-blue-500/40 transition-colors duration-500">
+            <div className="relative flex items-center bg-card/80 backdrop-blur-xl rounded-[14px]">
+              <Search className="absolute left-4 w-5 h-5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
+              <input
+                type="text"
+                placeholder="Enter S3 bucket name to scan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 text-base rounded-[14px]"
+              />
+              <div className="pr-2">
+                <button type="submit" disabled={scanning || !searchQuery}
+                  className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50 disabled:shadow-none transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2">
+                  {scanning ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Scanning</>) : (<>Scan</>)}
+                </button>
+              </div>
+            </div>
           </div>
-          <button type="submit" disabled={scanning || !searchQuery}
-            className="px-6 py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-md shadow-blue-600/15 hover:shadow-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap">
-            {scanning ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Scanning...</>) : (<><Search className="w-4 h-4" /> Scan Bucket</>)}
-          </button>
-        </div>
-      </motion.form>
+        </motion.form>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard icon={Shield} label="Total Buckets" value={totalBuckets} accent="bg-gradient-to-br from-blue-500 to-blue-600" delay={2} />
-        <StatCard icon={AlertTriangle} label="High Risk" value={highRisk} accent="bg-gradient-to-br from-red-500 to-rose-600" delay={3} />
-        <StatCard icon={CheckCircle2} label="Compliant" value={compliant} accent="bg-gradient-to-br from-emerald-500 to-green-600" delay={4} />
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <StatCard icon={Shield} label="Total Buckets" value={totalBuckets} accent="bg-gradient-to-br from-blue-500 to-blue-600" delay={2} />
+          <StatCard icon={AlertTriangle} label="High Risk" value={highRisk} accent="bg-gradient-to-br from-red-500 to-rose-600" delay={3} />
+          <StatCard icon={CheckCircle2} label="Compliant" value={compliant} accent="bg-gradient-to-br from-emerald-500 to-green-600" delay={4} />
+        </div>
+
+        {/* Table */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={5} className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xl font-bold text-foreground">Active Infrastructure</h2>
+            <button onClick={fetchData} disabled={loading}
+              className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all hover:rotate-180 duration-500">
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          <div className={`relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-sm overflow-hidden min-h-[400px] transition-all duration-500 ${loading ? 'opacity-80' : 'opacity-100'}`}>
+            {loading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin" />
+                  <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-cyan-400/20 border-b-cyan-400 animate-spin-reverse" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground animate-pulse">Syncing infrastructure...</p>
+              </div>
+            ) : error ? (
+              <div className="absolute inset-0 flex items-center justify-center text-center p-6">
+                <div className="max-w-md p-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400">
+                  <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-80" />
+                  <h3 className="font-semibold mb-1">Error Loading Data</h3>
+                  <p className="text-sm opacity-90">{error}</p>
+                </div>
+              </div>
+            ) : (
+              <BucketTable buckets={buckets} />
+            )}
+          </div>
+        </motion.div>
       </div>
-
-      {/* Table */}
-      <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={5} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-foreground">Bucket Inventory</h2>
-          <button onClick={fetchData} disabled={loading}
-            className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-56 gap-3">
-            <RefreshCw className="w-8 h-8 text-muted-foreground animate-spin" />
-            <p className="text-sm text-muted-foreground">Loading data...</p>
-          </div>
-        ) : error ? (
-          <div className="p-5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-600 dark:text-red-400">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <p className="text-sm font-medium">{error}</p>
-          </div>
-        ) : (
-          <BucketTable buckets={buckets} />
-        )}
-      </motion.div>
     </div>
   );
 };

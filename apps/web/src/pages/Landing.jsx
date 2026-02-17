@@ -87,20 +87,53 @@ const Landing = () => {
       <section className="snap-section relative min-h-[100dvh] flex items-center justify-center overflow-hidden">
         {/* Animated orbs */}
         <div className="pointer-events-none absolute inset-0">
-          <motion.div animate={{ x: [0, 50, 0], y: [0, -40, 0] }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-            className="absolute -top-52 -left-52 w-[700px] h-[700px] bg-blue-500/[0.07] dark:bg-blue-500/[0.15] rounded-full blur-[140px]" />
-          <motion.div animate={{ x: [0, -45, 0], y: [0, 45, 0] }} transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
-            className="absolute top-1/4 -right-40 w-[550px] h-[550px] bg-cyan-400/[0.06] dark:bg-cyan-400/[0.14] rounded-full blur-[130px]" />
-          <motion.div animate={{ x: [0, 30, 0], y: [0, -25, 0] }} transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
-            className="absolute bottom-1/4 left-1/3 w-[450px] h-[450px] bg-purple-500/[0.05] dark:bg-purple-500/[0.12] rounded-full blur-[130px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle,rgba(100,140,255,0.05)_1px,transparent_1px)] dark:bg-[radial-gradient(circle,rgba(100,140,255,0.07)_1px,transparent_1px)] bg-[size:28px_28px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,hsl(var(--background))_70%)]" />
+          <motion.div
+            animate={{
+              x: [0, 100, 0],
+              y: [0, -60, 0],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{
+              duration: 18,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-blue-600/20 blur-[120px] rounded-full mix-blend-screen"
+          />
+          <motion.div
+            animate={{
+              x: [0, -80, 0],
+              y: [0, 90, 0],
+              scale: [1, 1.1, 1],
+            }}
+            transition={{
+              duration: 22,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="absolute top-1/3 -right-20 w-[500px] h-[500px] bg-cyan-500/15 blur-[100px] rounded-full mix-blend-screen"
+          />
+          <motion.div
+            animate={{
+              x: [0, 60, 0],
+              y: [0, -50, 0],
+              scale: [1, 1.3, 1],
+            }}
+            transition={{
+              duration: 20,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="absolute bottom-0 left-1/4 w-[600px] h-[400px] bg-purple-600/15 blur-[120px] rounded-full mix-blend-screen"
+          />
+          <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-[0.03] dark:opacity-[0.05]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-background" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-6 text-center pt-16">
+        <div className="relative max-w-5xl mx-auto px-6 text-center pt-16 z-10">
           {/* Badge */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}
-            className="inline-flex items-center gap-2.5 px-5 py-2 mb-10 rounded-full border border-border bg-card/60 backdrop-blur-sm text-xs font-medium text-muted-foreground shadow-sm">
+            className="inline-flex items-center gap-2.5 px-5 py-2 mb-8 rounded-full border border-white/10 bg-white/5 backdrop-blur-md text-xs font-medium text-muted-foreground shadow-lg shadow-black/5 hover:bg-white/10 transition-colors cursor-default">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -110,41 +143,52 @@ const Landing = () => {
 
           {/* Heading */}
           <motion.h1 initial="hidden" animate="visible" variants={fadeUp} custom={1}
-            className="text-5xl sm:text-6xl lg:text-7xl xl:text-[5.5rem] font-extrabold tracking-tight leading-[1.05] mb-7">
+            className="text-5xl sm:text-6xl lg:text-8xl font-black tracking-tight leading-[1] mb-8 drop-shadow-sm">
             Cloud Security,
-            <br className="hidden sm:block" />
-            <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-400 dark:from-blue-400 dark:via-cyan-300 dark:to-blue-300 bg-clip-text text-transparent">
+            <br />
+            <span className="bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-500 dark:from-blue-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent pb-2">
               Reimagined
             </span>
           </motion.h1>
 
           <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={2}
-            className="max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground leading-relaxed mb-12">
+            className="max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground/80 leading-relaxed mb-12 font-light">
             Autonomous S3 bucket scanning, AI&#8209;powered compliance reasoning, and
             one&#8209;click remediation — all in a single platform.
           </motion.p>
 
           {/* CTAs */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={3}
-            className="flex flex-wrap items-center justify-center gap-4 mb-16">
+            className="flex flex-wrap items-center justify-center gap-5 mb-16">
             <Link to="/signup">
-              <button className="group relative px-9 py-4 rounded-2xl font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-xl shadow-blue-600/20 hover:shadow-blue-600/40 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.03] text-sm">
-                Get Started Free
-                <ArrowRight className="inline-block ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </button>
+              <motion.button
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className="group relative px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-xl shadow-blue-600/30 hover:shadow-blue-600/50 transition-all duration-300 text-sm overflow-hidden"
+              >
+                <span className="relative z-10 flex items-center">
+                  Get Started Free
+                  <ArrowRight className="inline-block ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </motion.button>
             </Link>
-            <button onClick={handleTryDemo}
-              className="group px-9 py-4 rounded-2xl font-semibold border border-border hover:bg-card hover:border-blue-400/50 transition-all duration-300 hover:-translate-y-1 text-sm">
+            <motion.button
+              onClick={handleTryDemo}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              className="group px-8 py-4 rounded-2xl font-bold border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 text-sm shadow-lg hover:shadow-xl"
+            >
               Try Live Demo
-              <ArrowRight className="inline-block ml-2 w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
-            </button>
+              <ArrowRight className="inline-block ml-2 w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-blue-400" />
+            </motion.button>
           </motion.div>
 
           {/* Trust */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={4}
-            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-muted-foreground">
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-xs font-medium text-muted-foreground/60">
             {['SOC 2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO 27001'].map((s) => (
-              <span key={s} className="flex items-center gap-1.5">
+              <span key={s} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {s}
               </span>
             ))}
@@ -152,11 +196,19 @@ const Landing = () => {
         </div>
 
         {/* Scroll hint */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5, duration: 1 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50 font-medium">Scroll</span>
-          <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}>
-            <ChevronDown className="w-4 h-4 text-muted-foreground/40" />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
+          <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/40 font-semibold">Scroll</span>
+          <motion.div
+            animate={{ y: [0, 10, 0], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            className="w-5 h-8 rounded-full border border-muted-foreground/30 flex justify-center pt-2"
+          >
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="w-1 h-1 rounded-full bg-muted-foreground/60"
+            />
           </motion.div>
         </motion.div>
       </section>
