@@ -33,7 +33,8 @@ const PasswordStrength = ({ password }) => {
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signup, loginDemo, isAuthenticated } = useAuth();
+  const auth = useAuth();
+  const { signup, loginDemo, isAuthenticated } = auth || {};
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '', confirmPassword: '', company: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -59,7 +60,7 @@ const Signup = () => {
     setLoading(true);
     try {
       await signup(formData.email, formData.password, formData.fullName, formData.company);
-      navigate('/dashboard');
+      // Navigation handled by useEffect
     } catch (err) {
       console.error(err);
       if (err.data?.data?.email?.code === 'validation_not_unique') setError("Email already registered. Sign in instead.");
@@ -79,7 +80,7 @@ const Signup = () => {
       </div>
 
       <div className="flex-1 flex items-center justify-center py-12 px-4 relative z-10">
-        <motion.div initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.5, ease:[0.25,0.46,0.45,0.94] }} className="w-full max-w-[420px]">
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }} className="w-full max-w-[420px]">
           <div className="bg-card rounded-2xl shadow-xl shadow-black/[0.04] dark:shadow-black/20 border border-border overflow-hidden">
             {/* Header */}
             <div className="px-8 pt-10 pb-8">
@@ -95,7 +96,7 @@ const Signup = () => {
 
             <div className="px-8 pb-8 space-y-5">
               {error && (
-                <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }}
+                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /><p>{error}</p>
                 </motion.div>
@@ -117,8 +118,8 @@ const Signup = () => {
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">Password</label>
                   <div className="relative">
-                    <input id="password" name="password" type={showPassword?'text':'password'} required className="input-field pr-10" placeholder="••••••••" value={formData.password} onChange={handleChange} />
-                    <button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    <input id="password" name="password" type={showPassword ? 'text' : 'password'} required className="input-field pr-10" placeholder="••••••••" value={formData.password} onChange={handleChange} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -127,8 +128,8 @@ const Signup = () => {
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1.5">Confirm Password</label>
                   <div className="relative">
-                    <input id="confirmPassword" name="confirmPassword" type={showConfirmPassword?'text':'password'} required className="input-field pr-10" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} />
-                    <button type="button" onClick={()=>setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    <input id="confirmPassword" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} required className="input-field pr-10" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>

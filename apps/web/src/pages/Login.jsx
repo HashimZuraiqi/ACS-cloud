@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Loader2, AlertCircle, Eye, EyeOff, ArrowRight, Shield } from 'lucide-react';
 import PublicHeader from '@/components/PublicHeader';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,8 +9,11 @@ import { motion } from 'framer-motion';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginDemo, isAuthenticated } = useAuth();
-  
+  console.log("Login: useAuth import:", useAuth);
+  const auth = useAuth();
+  const { login, loginDemo, isAuthenticated } = auth || {}; // Prevent crash if auth is undefined
+
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -46,8 +49,9 @@ const Login = () => {
     setLoading(true);
     try {
       await login(email, password);
+      console.log("Login: Success");
       if (rememberMe) localStorage.setItem('rememberEmail', email);
-      navigate(from, { replace: true });
+      // Navigation is handled by useEffect when isAuthenticated becomes true
     } catch (err) {
       console.error(err);
       if (err.status === 400) setError("Invalid email or password.");
@@ -76,7 +80,7 @@ const Login = () => {
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.25,0.46,0.45,0.94] }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="w-full max-w-[420px]"
         >
           <div className="bg-card rounded-2xl shadow-xl shadow-black/[0.04] dark:shadow-black/20 border border-border overflow-hidden">
@@ -95,7 +99,7 @@ const Login = () => {
             <div className="px-8 pb-8 space-y-5">
               {/* Error */}
               {error && (
-                <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }}
+                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   <p>{error}</p>
@@ -105,7 +109,7 @@ const Login = () => {
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                  <input id="email" type="email" required className="input-field" placeholder="you@company.com" value={email} onChange={(e)=>setEmail(e.target.value)} />
+                  <input id="email" type="email" required className="input-field" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
 
                 <div>
@@ -114,8 +118,8 @@ const Login = () => {
                     <Link to="#" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">Forgot?</Link>
                   </div>
                   <div className="relative">
-                    <input id="password" type={showPassword?'text':'password'} required className="input-field pr-10" placeholder="••••••••" value={password} onChange={(e)=>setPassword(e.target.value)} />
-                    <button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    <input id="password" type={showPassword ? 'text' : 'password'} required className="input-field pr-10" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>

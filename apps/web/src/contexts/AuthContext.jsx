@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useState, useEffect } from 'react';
-import pb from '@/lib/pocketbaseClient';
+import { api } from '@/services/api';
 
 const AuthContext = createContext();
 
@@ -8,33 +8,33 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(pb.authStore.model);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = () => {
-      if (pb.authStore.isValid) {
-        setCurrentUser(pb.authStore.model);
-      } else {
+    const checkAuth = async () => {
+      try {
+        const user = await api.getMe();
+        setCurrentUser(user);
+      } catch (error) {
+        // Token invalid or missing
         setCurrentUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     checkAuth();
-    const unsubscribe = pb.authStore.onChange((token, model) => {
-      setCurrentUser(model);
-    });
-    return () => { unsubscribe(); };
   }, []);
 
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      const authData = await pb.collection('users').authWithPassword(email, password);
-      return authData;
+      const data = await api.login(email, password);
+      setCurrentUser(data.user);
+      return data;
     } catch (error) {
       console.error('Login error:', error);
-      throw error;
+      throw error.response?.data || error;
     } finally {
       setIsLoading(false);
     }
@@ -43,33 +43,28 @@ export const AuthProvider = ({ children }) => {
   const signup = async (email, password, fullName, company) => {
     setIsLoading(true);
     try {
-      await pb.collection('users').create({
-        email, password, passwordConfirm: password, fullName, company,
-      });
-      return await login(email, password);
+      const data = await api.signup({ email, password, fullName, company });
+      setCurrentUser(data.user);
+      return data;
     } catch (error) {
       console.error('Signup error:', error);
-      throw error;
+      throw error.response?.data || error;
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = () => {
-    pb.authStore.clear();
+    api.logout();
     setCurrentUser(null);
   };
 
   const loginDemo = () => {
     setCurrentUser({
-      id: "demo",
       email: "demo@example.com",
-      name: "Demo User",
-      collectionId: "demo",
-      collectionName: "users",
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-      avatar: "",
+      fullName: "Demo User",
+      company: "CloudGuard Demo",
+      role: "admin"
     });
   };
 

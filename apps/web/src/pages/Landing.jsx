@@ -6,57 +6,60 @@ import { motion, useInView } from 'framer-motion'
 import {
   Shield, ShieldCheck, BrainCircuit, Zap, Eye, Lock, ArrowRight,
   CheckCircle2, BarChart3, GitBranch, Cpu, ScanSearch,
-  ChevronDown
-} from 'lucide-react'
+  ChevronDown, AlertTriangle, XCircle, Terminal, FileJson, Check,
+  Clock, DollarSign
+}
+  from 'lucide-react'
 
 /* ── Variants ── */
-const ease = [0.22, 1, 0.36, 1]
+/* ── Variants ── */
+const ease = [0.25, 0.1, 0.25, 1]
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 60 },
+  hidden: { opacity: 0, y: 30 },
   visible: (i = 0) => ({
     opacity: 1, y: 0,
-    transition: { duration: 1, delay: i * 0.12, ease },
+    transition: { duration: 1, delay: i * 0.1, ease },
   }),
 }
 
 const scaleIn = {
-  hidden: { opacity: 0, scale: 0.85, y: 40 },
+  hidden: { opacity: 0, scale: 0.9, y: 20 },
   visible: (i = 0) => ({
     opacity: 1, scale: 1, y: 0,
-    transition: { duration: 0.8, delay: i * 0.08, ease },
+    transition: { duration: 0.8, delay: i * 0.05, ease },
   }),
 }
 
 const slideLeft = {
-  hidden: { opacity: 0, x: 60 },
+  hidden: { opacity: 0, x: 40 },
   visible: (i = 0) => ({
     opacity: 1, x: 0,
-    transition: { duration: 0.9, delay: i * 0.1, ease },
+    transition: { duration: 0.8, delay: i * 0.05, ease },
   }),
 }
 
 const stagger = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
+  visible: { transition: { staggerChildren: 0.15, delayChildren: 0.1 } },
 }
 
 /* ── Animated Section Card ── */
 const SectionCard = ({ children, className = '', id }) => {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, amount: 0.15 })
+  const isInView = useInView(ref, { once: false, amount: 0.25 })
 
   return (
     <section
       id={id}
       ref={ref}
-      className={`snap-section relative min-h-[100dvh] flex items-center justify-center ${className}`}
+      className={`snap-section relative min-h-[100dvh] w-full flex items-center justify-center p-6 ${className}`}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 30 }}
-        animate={isInView ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.96, y: 30 }}
-        transition={{ duration: 0.9, ease }}
-        className="w-full"
+        variants={stagger}
+        initial="hidden"
+        animate={isInView ? "visible" : "hidden"}
+        className="w-full max-w-[1400px] mx-auto"
       >
         {children}
       </motion.div>
@@ -213,19 +216,58 @@ const Landing = () => {
         </motion.div>
       </section>
 
+      {/* ═══════════════ THE PROBLEM ═══════════════ */}
+      <SectionCard id="problem" className="border-b border-white/5">
+        <div className="max-w-6xl mx-auto px-6 w-full">
+          <motion.div variants={stagger} className="text-center mb-16">
+            <motion.h2 variants={fadeUp}
+              className="text-3xl sm:text-4xl lg:text-6xl font-bold tracking-tight mb-6">Why Cloud Security is Broken</motion.h2>
+            <motion.p variants={fadeUp}
+              className="max-w-2xl mx-auto text-muted-foreground text-lg sm:text-xl">
+              Manual reviews can't keep up with the speed of cloud deployment. The result? Catastrophic exposure.
+            </motion.p>
+          </motion.div>
+
+          <motion.div variants={stagger} className="grid md:grid-cols-3 gap-8">
+            <motion.div variants={scaleIn} custom={0} className="p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
+              <div className="mx-auto w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
+                <AlertTriangle className="w-10 h-10 text-red-500" />
+              </div>
+              <div className="text-5xl font-black text-foreground mb-2">93%</div>
+              <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Misconfiguration</div>
+              <p className="text-muted-foreground leading-relaxed">of cloud breaches are caused by simple misconfigurations, not advanced hacks.</p>
+            </motion.div>
+            <motion.div variants={scaleIn} custom={1} className="p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
+              <div className="mx-auto w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center mb-6">
+                <Clock className="w-10 h-10 text-orange-500" />
+              </div>
+              <div className="text-5xl font-black text-foreground mb-2">200+ Days</div>
+              <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Exposure Time</div>
+              <p className="text-muted-foreground leading-relaxed">Average time it takes to detect a breach. By then, your data is long gone.</p>
+            </motion.div>
+            <motion.div variants={scaleIn} custom={2} className="p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
+              <div className="mx-auto w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-6">
+                <DollarSign className="w-10 h-10 text-blue-500" />
+              </div>
+              <div className="text-5xl font-black text-foreground mb-2">$4.45M</div>
+              <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Avg Cost</div>
+              <p className="text-muted-foreground leading-relaxed">The average cost of a data breach in 2024. Can your startup survive that?</p>
+            </motion.div>
+          </motion.div>
+        </div>
+      </SectionCard>
+
       {/* ═══════════════ PIPELINE ═══════════════ */}
       <SectionCard id="pipeline">
         <div className="max-w-6xl mx-auto px-6 w-full">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={stagger}
-            className="text-center mb-16 lg:mb-20">
+          <motion.div variants={stagger} className="text-center mb-16 lg:mb-20">
             <motion.p variants={fadeUp}
               className="text-sm font-semibold text-blue-500 uppercase tracking-[0.2em] mb-4">Pipeline</motion.p>
             <motion.h2 variants={fadeUp}
               className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Five Steps to Total Security</motion.h2>
           </motion.div>
 
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }} variants={stagger}
-            className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+          <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-5">
             {[
               { num: '01', icon: ScanSearch, title: 'Scan', desc: 'Auto-discover every bucket and its configuration in seconds.' },
               { num: '02', icon: BrainCircuit, title: 'Analyze', desc: 'Nova 2 Lite reasons across compliance frameworks.' },
@@ -263,8 +305,7 @@ const Landing = () => {
             className="absolute top-1/3 -right-40 w-[500px] h-[500px] bg-blue-500/[0.04] dark:bg-blue-500/[0.09] rounded-full blur-[100px]" />
         </div>
         <div className="relative max-w-6xl mx-auto px-6 w-full">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={stagger}
-            className="text-center mb-16 lg:mb-20">
+          <motion.div variants={stagger} className="text-center mb-16 lg:mb-20">
             <motion.p variants={fadeUp}
               className="text-sm font-semibold text-blue-500 uppercase tracking-[0.2em] mb-4">Features</motion.p>
             <motion.h2 variants={fadeUp}
@@ -273,8 +314,7 @@ const Landing = () => {
               className="max-w-xl mx-auto text-muted-foreground text-lg">From detection to remediation, CloudGuard handles the entire security lifecycle.</motion.p>
           </motion.div>
 
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.1 }} variants={stagger}
-            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div variants={stagger} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: ScanSearch, title: 'Intelligent Scanning', desc: 'Deep inspection of ACLs, bucket policies, encryption, versioning, logging and public access blocks.' },
               { icon: BrainCircuit, title: 'AI Reasoning', desc: 'Nova 2 Lite evaluates every finding against SOC 2, GDPR, HIPAA, and PCI-DSS simultaneously.' },
@@ -305,12 +345,112 @@ const Landing = () => {
         </div>
       </SectionCard>
 
+      {/* ═══════════════ CODE COMPARISON ═══════════════ */}
+      <SectionCard id="code-comparison" className="bg-black/20">
+        <div className="max-w-7xl mx-auto px-6 w-full">
+          <motion.div variants={stagger} className="grid lg:grid-cols-2 gap-12 items-center">
+
+            <div className="space-y-8">
+              <motion.div variants={fadeUp}>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-6">
+                  Don't Just Find It. <br />
+                  <span className="text-blue-500">Fix It.</span>
+                </h2>
+                <p className="text-lg text-muted-foreground leading-relaxed">
+                  Traditional tools give you a PDF report. <span className="text-foreground font-medium">CloudGuard gives you the code.</span>
+                  <br /><br />
+                  Our <span className="text-blue-400">Remediation Planner</span> generates precise, least-privilege IAM policies to replace over-permissive configurations. Review the diff, approve with one click, and sleep soundly.
+                </p>
+              </motion.div>
+
+              <motion.div variants={fadeUp} className="flex gap-4">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                  </div>
+                  <span>Blocks Public Access</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <span>Enforces Encryption</span>
+                </div>
+              </motion.div>
+            </div>
+
+            <motion.div variants={scaleIn} className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-900/20 font-mono text-sm bg-[#0d1117]">
+              <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/5">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500/20" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/20" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/20" />
+                </div>
+                <div className="flex gap-4 text-xs font-medium text-muted-foreground">
+                  <span className="text-red-400">Current Policy</span>
+                  <span className="text-emerald-400">Nova Generated</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 divide-x divide-white/5">
+                {/* Bad Code */}
+                <div className="p-4 overflow-x-auto">
+                  <pre className="text-red-300 opacity-70">
+                    {`{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": "*"
+    }
+  ]
+}`}
+                  </pre>
+                  <div className="mt-4 flex items-center gap-2 text-xs text-red-400">
+                    <AlertTriangle className="w-3 h-3" /> Critical Analysis: Public R/W
+                  </div>
+                </div>
+
+                {/* Good Code */}
+                <div className="p-4 bg-blue-500/5 overflow-x-auto relative">
+                  <div className="absolute top-0 right-0 p-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-bl-lg">
+                    RECOMMENDED
+                  </div>
+                  <pre className="text-blue-300">
+                    {`{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    }
+  ]
+}`}
+                  </pre>
+                  <div className="mt-4 flex items-center gap-2 text-xs text-emerald-400">
+                    <Check className="w-3 h-3" /> Fix Applied: Enforce TLS & Least Privilege
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+          </motion.div>
+        </div>
+      </SectionCard>
+
       {/* ═══════════════ ARCHITECTURE ═══════════════ */}
       <SectionCard id="architecture">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-card/0 via-card/40 to-card/0" />
         <div className="relative max-w-6xl mx-auto px-6 w-full">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={stagger}
-            className="text-center mb-16 lg:mb-20">
+          <motion.div variants={stagger} className="text-center mb-16 lg:mb-20">
             <motion.p variants={fadeUp}
               className="text-sm font-semibold text-blue-500 uppercase tracking-[0.2em] mb-4">Architecture</motion.p>
             <motion.h2 variants={fadeUp}
@@ -319,8 +459,7 @@ const Landing = () => {
               className="max-w-xl mx-auto text-muted-foreground text-lg">Five autonomous agents work in concert to secure your cloud.</motion.p>
           </motion.div>
 
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }} variants={stagger}
-            className="flex flex-col lg:flex-row gap-4">
+          <motion.div variants={stagger} className="flex flex-col lg:flex-row gap-4">
             {[
               { icon: ScanSearch, name: 'Scanner Agent', desc: 'Fetches and normalizes bucket configs, policies, and metadata from AWS.' },
               { icon: Cpu, name: 'Compliance Reasoner', desc: 'Nova 2 Lite analyzes violations across multiple compliance frameworks.' },
@@ -351,6 +490,37 @@ const Landing = () => {
         </div>
       </SectionCard>
 
+      {/* ═══════════════ FAQ ═══════════════ */}
+      <SectionCard id="faq" className="border-t border-white/5">
+        <div className="max-w-4xl mx-auto px-6 w-full">
+          <motion.div variants={stagger}
+            className="text-center mb-16">
+            <motion.h2 variants={fadeUp}
+              className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-6">Frequently Asked Questions</motion.h2>
+          </motion.div>
+
+          <div className="grid gap-6">
+            {[
+              { q: "Is it safe to let AI fix my infrastructure?", a: "Absolutely. CloudGuard uses a Human-in-the-Loop model. The AI proposes a remediation plan (Terraform/Policy JSON), but NOTHING is applied until a human approves it." },
+              { q: "Does this work for production environments?", a: "Yes. Our Scanner Agent is read-only and non-intrusive. The Execution Agent only acts when you explicitly approve a fix." },
+              { q: "What compliance frameworks do you support?", a: "Currently, we support SOC 2, HIPAA, GDPR, and PCI-DSS. The Compliance Reasoner (Nova 2 Lite) maps your config directly to these controls." }
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                variants={slideLeft}
+                className="group p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md hover:bg-card/60 hover:border-blue-500/30 transition-all cursor-default"
+              >
+                <h3 className="text-xl font-bold text-foreground mb-3 flex items-center gap-4">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 text-sm font-black shadow-inner shadow-blue-500/20">?</span>
+                  {item.q}
+                </h3>
+                <p className="text-muted-foreground ml-12 text-lg leading-relaxed">{item.a}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+
       {/* ═══════════════ CTA ═══════════════ */}
       <SectionCard id="cta" className="overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
@@ -360,7 +530,7 @@ const Landing = () => {
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-500/[0.04] dark:bg-purple-500/[0.09] rounded-full blur-[110px]" />
         </div>
         <div className="relative max-w-3xl mx-auto px-6 text-center">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={stagger}>
+          <motion.div variants={stagger}>
             <motion.div variants={scaleIn} custom={0}
               className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-600/25">
               <ShieldCheck className="w-10 h-10 text-white" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RefreshCw, Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { getResults, scanBucket } from '@/lib/api';
+import { api } from '@/services/api';
 import BucketTable from '@/components/BucketTable.jsx';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,9 +63,28 @@ const Dashboard = () => {
   const { toast } = useToast();
 
   const fetchData = async () => {
-    try { setLoading(true); const data = await getResults(); setBuckets(data); setError(null); }
-    catch (err) { setError('Failed to load dashboard data.'); console.error(err); }
-    finally { setLoading(false); }
+    try {
+      setLoading(true);
+      const data = await api.getScans();
+
+      // Map Backend DB format to UI format
+      const mapped = (data || []).map(scan => ({
+        scanId: scan.scan_id,
+        bucketName: scan.bucket,
+        riskScore: scan.risk_score,
+        riskLevel: scan.severity ? scan.severity.toLowerCase() : (scan.risk_score > 50 ? 'high' : 'low'),
+        status: scan.status === 'SECURE' ? 'compliant' : 'non-compliant',
+        timestamp: scan.created_at,
+      }));
+
+      setBuckets(mapped);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load dashboard data.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -75,11 +94,15 @@ const Dashboard = () => {
     if (!searchQuery.trim()) return;
     setScanning(true);
     try {
-      await scanBucket(searchQuery);
+      await api.triggerScan(searchQuery);
       toast({ title: "Scan complete", description: `Scanned: ${searchQuery}`, variant: "success" });
-      await fetchData(); setSearchQuery('');
-    } catch (err) { toast({ title: "Scan failed", description: err.message, variant: "destructive" }); }
-    finally { setScanning(false); }
+      await fetchData();
+      setSearchQuery('');
+    } catch (err) {
+      toast({ title: "Scan failed", description: err.message || "Error scanning bucket", variant: "destructive" });
+    } finally {
+      setScanning(false);
+    }
   };
 
   const totalBuckets = buckets.length;

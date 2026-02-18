@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, ShieldAlert, FileJson, BrainCircuit, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { getScan } from '@/lib/api';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button.jsx';
 import { useToast } from '@/components/ui/use-toast';
 import RiskBadge from '@/components/RiskBadge.jsx';
@@ -37,7 +37,42 @@ const BucketDetail = () => {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   const fetchScan = async () => {
-    try { setLoading(true); const data = await getScan(scanId); setScanResult(data); setError(null); } catch (err) { setError(err.message); } finally { setLoading(false); }
+    try {
+      setLoading(true);
+      const data = await api.getScanResult(scanId);
+
+      // Map Backend DB format to UI format
+      const mapped = {
+        scanId: data.scan_id,
+        bucketName: data.bucket,
+        riskScore: data.risk_score,
+        status: data.status === 'SECURE' ? 'compliant' : 'warning',
+        timestamp: data.created_at,
+        configuration: JSON.parse(data.raw_config || '{}'),
+        aiAnalysis: {
+          explanation: data.explanation,
+          reasoning: data.explanation // or data.findings joined
+        },
+        complianceViolations: (data.findings || []).map(f => ({
+          standard: "SOC 2",
+          requirement: f
+        })),
+        remediationPlan: data.remediation ? [{
+          id: 'rem-1',
+          title: 'Enforce Security Controls',
+          description: data.remediation,
+          type: 'automated',
+          priority: 'high'
+        }] : []
+      };
+
+      setScanResult(mapped);
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Failed to load scan");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { if (scanId) { fetchScan(); } }, [scanId]);

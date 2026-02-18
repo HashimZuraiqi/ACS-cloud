@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Activity, RefreshCw, AlertCircle } from 'lucide-react';
-import { getHistory } from '@/lib/api';
+import { api } from '@/services/api';
 import ActivityTimeline from '@/components/ActivityTimeline.jsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -20,8 +20,20 @@ const ActivityLog = () => {
     const fetchHistory = async () => {
       try {
         setLoading(true);
-        const data = await getHistory();
-        setActivities(data);
+        const data = await api.getScans();
+
+        // Transform API data to match ActivityTimeline props
+        const formattedData = data.map(scan => ({
+          id: scan.scan_id,
+          action: scan.status === 'SECURE' ? 'Remediation Executed' : 'Security Scan Completed',
+          bucketName: scan.bucket,
+          details: scan.status === 'SECURE' ? `Successfully blocked public access for ${scan.bucket}` : `Detected risk level: ${scan.risk_score ? scan.risk_score : 'Unknown'}`,
+          status: scan.status === 'SECURE' ? 'success' : 'warning', // Timeline expects success/failed/warning
+          timestamp: scan.created_at,
+          user: currentUser?.email || 'System'
+        })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        setActivities(formattedData);
       } catch (err) {
         setError('Failed to load activity history');
         console.error(err);
@@ -31,7 +43,7 @@ const ActivityLog = () => {
     };
 
     fetchHistory();
-  }, []);
+  }, [currentUser]);
 
   return (
     <motion.div

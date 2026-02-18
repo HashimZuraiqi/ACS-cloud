@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/contexts/AuthContext';
 
 const fadeUp = {
     hidden: { opacity: 0, y: 20 },
@@ -19,6 +20,8 @@ const fadeUp = {
 };
 
 const Settings = () => {
+    const { currentUser } = useAuth();
+
     return (
         <div className="space-y-8 pb-12">
             <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="flex items-center gap-4 pb-6 border-b border-white/10">
@@ -46,14 +49,28 @@ const Settings = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="fullName">Full Name</Label>
-                                    <input type="text" id="fullName" defaultValue="Demo User" className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
+                                    <input
+                                        type="text"
+                                        id="fullName"
+                                        defaultValue={currentUser?.name || "CloudGuard User"}
+                                        disabled
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-muted-foreground cursor-not-allowed"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email">Email Address</Label>
-                                    <input type="email" id="email" defaultValue="demo@cloudguard.ai" className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" />
+                                    <input
+                                        type="email"
+                                        id="email"
+                                        defaultValue={currentUser?.email || ""}
+                                        disabled
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-muted-foreground cursor-not-allowed"
+                                    />
                                 </div>
                             </div>
-                            <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10">Update Profile</Button>
+                            <div className="text-xs text-muted-foreground">
+                                * Profile details are managed by your administrator.
+                            </div>
                         </div>
                     </motion.div>
 
@@ -90,15 +107,15 @@ const Settings = () => {
                         </div>
 
                         <div className="space-y-4 max-w-2xl">
-                            <Button variant="outline" className="w-full justify-between bg-white/5 border-white/10 hover:bg-white/10 h-auto py-4">
+                            <Button variant="outline" className="w-full justify-between bg-white/5 border-white/10 hover:bg-white/10 h-auto py-4" disabled>
                                 <div className="flex items-center gap-3">
                                     <Lock className="w-5 h-5 text-muted-foreground" />
                                     <div className="text-left">
                                         <p className="font-medium">Change Password</p>
-                                        <p className="text-xs text-muted-foreground">Last changed 30 days ago</p>
+                                        <p className="text-xs text-muted-foreground">Managed via Identity Provider</p>
                                     </div>
                                 </div>
-                                <span className="text-xs bg-white/10 px-2 py-1 rounded">Update</span>
+                                <span className="text-xs bg-white/10 px-2 py-1 rounded opacity-50">Locked</span>
                             </Button>
                         </div>
                     </motion.div>
