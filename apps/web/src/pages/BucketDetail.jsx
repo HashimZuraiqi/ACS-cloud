@@ -77,9 +77,13 @@ const BucketDetail = () => {
 
   useEffect(() => { if (scanId) { fetchScan(); } }, [scanId]);
 
-  const handleRemediationSuccess = (result) => {
+  const handleRemediationDone = (result) => {
     toast({ title: "Remediation Applied", description: result.message, variant: "success" });
-    setScanResult(prev => ({ ...prev, riskScore: result.newRiskScore, remediationPlan: [], status: result.newRiskScore < 40 ? 'compliant' : 'warning' }));
+    if (result.newScanId) {
+      navigate(`/bucket/${result.newScanId}`);
+    } else {
+      fetchScan();
+    }
   };
 
   if (loading) {
@@ -193,7 +197,7 @@ const BucketDetail = () => {
         <RemediationPlan actions={scanResult.remediationPlan} />
       </motion.div>
 
-      <ApprovalModal open={showApprovalModal} onOpenChange={setShowApprovalModal} scanId={scanResult.scanId} bucketName={scanResult.bucketName} actionCount={scanResult.remediationPlan?.length || 0} onSuccess={handleRemediationSuccess} />
+      <ApprovalModal open={showApprovalModal} onOpenChange={setShowApprovalModal} scanId={scanResult.scanId} resourceName={scanResult.bucketName} actionCount={scanResult.remediationPlan?.length || 0} serviceType="s3" onDone={handleRemediationDone} />
     </div>
   );
 };

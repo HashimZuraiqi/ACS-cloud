@@ -73,5 +73,26 @@ export const api = {
     approveFix: async (scanId) => {
         const response = await client.post('/remediate/approve', { scanId });
         return response.data;
+    },
+
+    // EC2 Scan Pipeline
+    triggerEC2Scan: async (instanceId) => {
+        const response = await client.post('/ec2-scan', instanceId ? { instanceId } : {});
+        return response.data;
+    },
+
+    getEC2Scans: async () => {
+        const response = await client.get('/ec2-scan');
+        return response.data;
+    },
+
+    getEC2ScanResult: async (scanId) => {
+        const response = await client.get(`/ec2-scan/${scanId}`);
+        return response.data;
+    },
+
+    approveEC2Fix: async (scanId) => {
+        const response = await client.post('/remediate/approve-ec2', { scanId });
+        return response.data;
     }
 };

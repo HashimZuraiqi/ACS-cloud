@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RefreshCw, Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Search, RefreshCw, Shield, AlertTriangle, CheckCircle2, Server, Database } from 'lucide-react';
 import { api } from '@/services/api';
 import BucketTable from '@/components/BucketTable.jsx';
+import InstanceTable from '@/components/InstanceTable.jsx';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 const ease = [0.22, 1, 0.36, 1];
 
@@ -53,21 +55,26 @@ const StatCard = ({ icon: Icon, label, value, accent, delay }) => (
   </motion.div>
 );
 
+const SERVICE_TABS = [
+  { id: 's3', label: 'S3 Buckets', icon: Database, accent: 'from-blue-600 to-cyan-500' },
+  { id: 'ec2', label: 'EC2 Instances', icon: Server, accent: 'from-orange-500 to-amber-500' },
+];
+
 const Dashboard = () => {
   const { currentUser } = useAuth();
+  const [activeService, setActiveService] = useState('s3');
   const [buckets, setBuckets] = useState([]);
+  const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
-  const fetchData = async () => {
+  const fetchS3Data = async () => {
     try {
       setLoading(true);
       const data = await api.getScans();
-
-      // Map Backend DB format to UI format
       const mapped = (data || []).map(scan => ({
         scanId: scan.scan_id,
         bucketName: scan.bucket,
@@ -76,38 +83,94 @@ const Dashboard = () => {
         status: scan.status === 'SECURE' ? 'compliant' : 'non-compliant',
         timestamp: scan.created_at,
       }));
-
       setBuckets(mapped);
       setError(null);
     } catch (err) {
-      setError('Failed to load dashboard data.');
+      setError('Failed to load S3 scan data.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchEC2Data = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getEC2Scans();
+      const mapped = (data || []).map(scan => {
+        let rawConfig = {};
+        try { rawConfig = JSON.parse(scan.raw_config || '{}'); } catch (e) { /* ignore */ }
+        return {
+          scanId: scan.scan_id,
+          instanceId: scan.instance_id,
+          instanceType: rawConfig.instance_type || 'N/A',
+          instanceState: rawConfig.state || 'unknown',
+          riskScore: scan.risk_score,
+          riskLevel: scan.severity ? scan.severity.toLowerCase() : (scan.risk_score > 50 ? 'high' : 'low'),
+          status: scan.status === 'SECURE' ? 'compliant' : 'non-compliant',
+          timestamp: scan.created_at,
+        };
+      });
+      setInstances(mapped);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load EC2 scan data.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchData = () => {
+    if (activeService === 's3') {
+      fetchS3Data();
+    } else {
+      fetchEC2Data();
+    }
+  };
+
+  useEffect(() => {
+    setSearchQuery('');
+    fetchData();
+  }, [activeService]);
 
   const handleScan = async (e) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
     setScanning(true);
     try {
-      await api.triggerScan(searchQuery);
-      toast({ title: "Scan complete", description: `Scanned: ${searchQuery}`, variant: "success" });
+      if (activeService === 's3') {
+        if (!searchQuery.trim()) {
+          setScanning(false);
+          return;
+        }
+        await api.triggerScan(searchQuery);
+        toast({ title: "S3 Scan complete", description: `Scanned: ${searchQuery}`, variant: "success" });
+      } else {
+        await api.triggerEC2Scan(searchQuery.trim() || undefined);
+        toast({
+          title: "EC2 Scan complete",
+          description: searchQuery.trim() ? `Scanned: ${searchQuery}` : "Scanned all running instances",
+          variant: "success"
+        });
+      }
       await fetchData();
       setSearchQuery('');
     } catch (err) {
-      toast({ title: "Scan failed", description: err.message || "Error scanning bucket", variant: "destructive" });
+      toast({
+        title: "Scan failed",
+        description: err?.response?.data?.error || err.message || "Error scanning resource",
+        variant: "destructive"
+      });
     } finally {
       setScanning(false);
     }
   };
 
-  const totalBuckets = buckets.length;
-  const highRisk = buckets.filter(b => b.riskLevel === 'high').length;
-  const compliant = buckets.filter(b => b.status === 'compliant').length;
+  const currentData = activeService === 's3' ? buckets : instances;
+  const totalResources = currentData.length;
+  const highRisk = currentData.filter(r => r.riskLevel === 'high' || r.riskLevel === 'critical').length;
+  const compliant = currentData.filter(r => r.status === 'compliant').length;
+  const resourceLabel = activeService === 's3' ? 'Total Buckets' : 'Total Instances';
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)]">
@@ -122,6 +185,38 @@ const Dashboard = () => {
           <p className="text-lg text-muted-foreground">Real-time infrastructure monitoring and compliance analysis.</p>
         </motion.div>
 
+        {/* Service Tabs */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0.5}>
+          <div className="inline-flex items-center p-1.5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-lg">
+            {SERVICE_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeService === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveService(tab.id)}
+                  className={cn(
+                    'relative flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300',
+                    isActive
+                      ? 'text-white shadow-lg'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="service-tab-bg"
+                      className={cn('absolute inset-0 rounded-xl bg-gradient-to-r', tab.accent)}
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                    />
+                  )}
+                  <Icon className="w-4 h-4 relative z-10" />
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+
         {/* Scan bar */}
         <motion.form onSubmit={handleScan} initial="hidden" animate="visible" variants={fadeUp} custom={1}
           className="max-w-2xl"
@@ -131,14 +226,19 @@ const Dashboard = () => {
               <Search className="absolute left-4 w-5 h-5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
               <input
                 type="text"
-                placeholder="Enter S3 bucket name to scan..."
+                placeholder={activeService === 's3' ? 'Enter S3 bucket name to scan...' : 'Enter EC2 Instance ID to scan (or leave empty for all)...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 text-base rounded-[14px]"
               />
               <div className="pr-2">
-                <button type="submit" disabled={scanning || !searchQuery}
-                  className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50 disabled:shadow-none transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2">
+                <button type="submit" disabled={scanning || (activeService === 's3' && !searchQuery)}
+                  className={cn(
+                    "px-5 py-2.5 rounded-xl font-semibold text-sm text-white shadow-lg disabled:opacity-50 disabled:shadow-none transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2",
+                    activeService === 's3'
+                      ? "bg-gradient-to-r from-blue-600 to-cyan-500 shadow-blue-500/25 hover:shadow-blue-500/40"
+                      : "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-orange-500/40"
+                  )}>
                   {scanning ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Scanning</>) : (<>Scan</>)}
                 </button>
               </div>
@@ -148,7 +248,8 @@ const Dashboard = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <StatCard icon={Shield} label="Total Buckets" value={totalBuckets} accent="bg-gradient-to-br from-blue-500 to-blue-600" delay={2} />
+          <StatCard icon={activeService === 's3' ? Shield : Server} label={resourceLabel} value={totalResources}
+            accent={activeService === 's3' ? "bg-gradient-to-br from-blue-500 to-blue-600" : "bg-gradient-to-br from-orange-500 to-amber-600"} delay={2} />
           <StatCard icon={AlertTriangle} label="High Risk" value={highRisk} accent="bg-gradient-to-br from-red-500 to-rose-600" delay={3} />
           <StatCard icon={CheckCircle2} label="Compliant" value={compliant} accent="bg-gradient-to-br from-emerald-500 to-green-600" delay={4} />
         </div>
@@ -156,7 +257,9 @@ const Dashboard = () => {
         {/* Table */}
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={5} className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-xl font-bold text-foreground">Active Infrastructure</h2>
+            <h2 className="text-xl font-bold text-foreground">
+              {activeService === 's3' ? 'Active Infrastructure' : 'EC2 Instances'}
+            </h2>
             <button onClick={fetchData} disabled={loading}
               className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all hover:rotate-180 duration-500">
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -167,8 +270,10 @@ const Dashboard = () => {
             {loading ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
                 <div className="relative">
-                  <div className="w-12 h-12 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin" />
-                  <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-cyan-400/20 border-b-cyan-400 animate-spin-reverse" />
+                  <div className={cn("w-12 h-12 rounded-full border-4 animate-spin",
+                    activeService === 's3' ? "border-blue-500/30 border-t-blue-500" : "border-orange-500/30 border-t-orange-500")} />
+                  <div className={cn("absolute inset-0 w-12 h-12 rounded-full border-4 animate-spin-reverse",
+                    activeService === 's3' ? "border-cyan-400/20 border-b-cyan-400" : "border-amber-400/20 border-b-amber-400")} />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground animate-pulse">Syncing infrastructure...</p>
               </div>
@@ -181,7 +286,21 @@ const Dashboard = () => {
                 </div>
               </div>
             ) : (
-              <BucketTable buckets={buckets} />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeService}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {activeService === 's3' ? (
+                    <BucketTable buckets={buckets} />
+                  ) : (
+                    <InstanceTable instances={instances} />
+                  )}
+                </motion.div>
+              </AnimatePresence>
             )}
           </div>
         </motion.div>

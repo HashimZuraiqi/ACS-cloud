@@ -1,0 +1,127 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Eye, ShieldCheck, ShieldAlert, Clock, ArrowRight, Server, Wifi, WifiOff } from 'lucide-react';
+import { motion } from 'framer-motion';
+import RiskBadge from '@/components/RiskBadge.jsx';
+import RiskScoreBar from '@/components/RiskScoreBar.jsx';
+import { cn } from '@/lib/utils';
+
+const InstanceTable = ({ instances }) => {
+    const navigate = useNavigate();
+
+    if (!instances || instances.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center py-20 px-4">
+                <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
+                    <Server className="w-10 h-10 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">No EC2 Instances Scanned Yet</h3>
+                <p className="text-muted-foreground max-w-sm mx-auto">
+                    Use the search bar above to scan an EC2 instance by ID, or leave empty to scan all running instances.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+                <thead>
+                    <tr className="border-b border-white/10 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        <th className="px-6 py-4 pl-8">Instance ID</th>
+                        <th className="px-6 py-4">State</th>
+                        <th className="px-6 py-4">Risk Level</th>
+                        <th className="px-6 py-4 w-48">Security Score</th>
+                        <th className="px-6 py-4">Compliance</th>
+                        <th className="px-6 py-4">Last Scanned</th>
+                        <th className="px-6 py-4 text-right pr-8">Actions</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                    {instances.map((instance, index) => (
+                        <motion.tr
+                            key={instance.scanId || instance.instanceId}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 + 0.2 }}
+                            className="group hover:bg-white/[0.03] transition-colors cursor-pointer"
+                            onClick={() => navigate(`/ec2/${instance.scanId}`)}
+                        >
+                            <td className="px-6 py-5 pl-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                                        <Server className="w-4 h-4 text-orange-400" />
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold text-foreground group-hover:text-blue-400 transition-colors text-base block mb-0.5">
+                                            {instance.instanceId}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">{instance.instanceType || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className="px-6 py-5">
+                                <div className="flex items-center gap-2">
+                                    {instance.instanceState === 'running' ? (
+                                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                            <Wifi className="w-3 h-3" />
+                                            <span className="text-xs font-medium">Running</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-500/10 text-gray-400 border border-gray-500/20">
+                                            <WifiOff className="w-3 h-3" />
+                                            <span className="text-xs font-medium capitalize">{instance.instanceState || 'Unknown'}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5">
+                                <RiskBadge riskScore={instance.riskScore} riskLevel={instance.riskLevel} />
+                            </td>
+                            <td className="px-6 py-5">
+                                <RiskScoreBar score={instance.riskScore} showLabel={false} className="max-w-[140px]" />
+                            </td>
+                            <td className="px-6 py-5">
+                                <div className="flex items-center gap-2">
+                                    {instance.status === 'compliant' ? (
+                                        <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                            <span className="font-medium text-xs">Compliant</span>
+                                        </div>
+                                    ) : (
+                                        <div className={cn(
+                                            "flex items-center gap-2 px-2.5 py-1 rounded-full border",
+                                            instance.status === 'non-compliant'
+                                                ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                                : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                        )}>
+                                            <ShieldAlert className="w-3.5 h-3.5" />
+                                            <span className="capitalize font-medium text-xs">{instance.status?.replace('-', ' ') || 'Unknown'}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5 text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                    <Clock className="w-3.5 h-3.5 opacity-70" />
+                                    {new Date(instance.timestamp).toLocaleDateString()}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5 text-right pr-8">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/ec2/${instance.scanId}`); }}
+                                    className="group/btn relative inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 hover:text-blue-300 transition-all active:scale-95"
+                                >
+                                    View Report
+                                    <ArrowRight className="w-3 h-3 transition-transform group-hover/btn:translate-x-0.5" />
+                                </button>
+                            </td>
+                        </motion.tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
+export default InstanceTable;
