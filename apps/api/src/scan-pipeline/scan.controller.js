@@ -8,52 +8,62 @@ const { v4: uuidv4 } = require('uuid');
 const TABLE_NAME = "CloudGuard_Scans"; // Ensure this table is created
 
 exports.startScan = async (req, res) => {
+    // If bucketName is provided, scan a specific bucket. Otherwise, scan all buckets.
     const { bucketName } = req.body;
+    const credentials = req.user?.awsCredentials;
 
-    if (!bucketName) {
-        return res.status(400).json({ error: "Bucket name is required" });
+    if (!credentials) {
+        return res.status(403).json({ error: "Missing AWS Credentials. Please update your Settings." });
     }
 
     try {
         // 1. Scan (Dev A)
-        const rawConfig = await scannerAgent.scanBucket(bucketName);
+        // ScannerAgent will return an array of configs (even if it's just one)
+        const rawConfigs = await scannerAgent.scanBuckets(credentials, bucketName);
 
-        // 2. Reason (Dev A)
-        const analysis = await complianceReasoner.analyze(rawConfig);
+        const scanResults = [];
 
-        // 3. Score (Dev A)
-        const score = riskScorer.calculate(analysis);
+        for (const rawConfig of rawConfigs) {
+            // 2. Reason (Dev A)
+            const analysis = await complianceReasoner.analyze(rawConfig, credentials);
 
-        // 4. Save to DB
-        const scanId = uuidv4();
-        const command = new PutCommand({
-            TableName: TABLE_NAME,
-            Item: {
+            // 3. Score (Dev A)
+            const score = riskScorer.calculate(analysis);
+
+            // 4. Save to DB
+            const scanId = uuidv4();
+            const command = new PutCommand({
+                TableName: TABLE_NAME,
+                Item: {
+                    scan_id: scanId,
+                    bucket: rawConfig.bucket, // Note: using bucket from rawConfig
+                    status: score.severity === "CRITICAL" || score.severity === "HIGH" ? "AT_RISK" : "SECURE",
+                    risk_score: score.score,
+                    severity: score.severity,
+                    compliance_status: analysis.compliance_status,
+                    findings: analysis.violations,
+                    explanation: analysis.reasoning,
+                    remediation: analysis.remediation_suggestion,
+                    raw_config: JSON.stringify(rawConfig),
+                    created_at: new Date().toISOString()
+                }
+            });
+
+            await docClient.send(command);
+            scanResults.push({
                 scan_id: scanId,
-                bucket: bucketName,
-                status: score.severity === "CRITICAL" || score.severity === "HIGH" ? "AT_RISK" : "SECURE",
-                risk_score: score.score,
-                severity: score.severity,
-                compliance_status: analysis.compliance_status,
-                findings: analysis.violations,
-                explanation: analysis.reasoning,
-                remediation: analysis.remediation_suggestion, // Save the fix suggestion
-                raw_config: JSON.stringify(rawConfig), // Store for audit
-                created_at: new Date().toISOString()
-            }
-        });
-
-        // Save to DB
-        await docClient.send(command);
+                result: {
+                    bucket: rawConfig.bucket,
+                    analysis,
+                    score
+                }
+            });
+        }
 
         // Response
         res.status(200).json({
-            scan_id: scanId,
-            result: {
-                bucket: bucketName,
-                analysis,
-                score
-            }
+            message: `Successfully scanned ${scanResults.length} bucket(s).`,
+            scans: scanResults
         });
 
     } catch (error) {

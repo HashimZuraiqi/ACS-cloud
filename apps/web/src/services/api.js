@@ -37,6 +37,11 @@ export const api = {
         return response.data;
     },
 
+    updateAwsCredentials: async (credentials) => {
+        const response = await client.put('/auth/aws-credentials', credentials);
+        return response.data;
+    },
+
     logout: () => {
         localStorage.removeItem('token');
         delete client.defaults.headers.common['Authorization'];
@@ -93,6 +98,22 @@ export const api = {
 
     approveEC2Fix: async (scanId) => {
         const response = await client.post('/remediate/approve-ec2', { scanId });
+        return response.data;
+    },
+
+    // IAM Scan Pipeline
+    triggerIAMScan: async (username) => {
+        const response = await client.post('/iam-scan', username ? { username } : {});
+        return response.data;
+    },
+
+    getIAMScans: async () => {
+        const response = await client.get('/iam-scan');
+        return response.data;
+    },
+
+    getIAMScanResult: async (scanId) => {
+        const response = await client.get(`/iam-scan/${scanId}`);
         return response.data;
     }
 };

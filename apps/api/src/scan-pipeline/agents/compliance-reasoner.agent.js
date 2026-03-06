@@ -2,12 +2,21 @@ const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-be
 
 class ComplianceReasonerAgent {
     constructor() {
-        this.bedrock = new BedrockRuntimeClient({ region: process.env.AWS_REGION || "us-east-1" });
-        this.modelId = "amazon.nova-micro-v1:0"; // Or nova-lite/nova-pro when available
+        this.modelId = "amazon.nova-micro-v1:0";
     }
 
-    async analyze(bucketConfig) {
+    async analyze(bucketConfig, credentials) {
+        if (!credentials) throw new Error("AWS Credentials are required");
         console.log(`[ComplianceReasoner] Analyzing config for: ${bucketConfig.bucket}`);
+
+        const clientConfig = {
+            region: credentials.region || "us-east-1",
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        };
+        const bedrock = new BedrockRuntimeClient(clientConfig);
 
         const prompt = `
       You are an expert Cloud Security Compliance Officer.
@@ -54,7 +63,7 @@ class ComplianceReasonerAgent {
 
             // REAL BEDROCK CALL
             try {
-                const response = await this.bedrock.send(command);
+                const response = await bedrock.send(command);
                 const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
                 // Parse Nova's output (handling potential markdown wrapping)

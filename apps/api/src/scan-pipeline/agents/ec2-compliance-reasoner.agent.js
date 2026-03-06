@@ -2,12 +2,21 @@ const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-be
 
 class EC2ComplianceReasonerAgent {
     constructor() {
-        this.bedrock = new BedrockRuntimeClient({ region: process.env.AWS_REGION || "us-east-1" });
         this.modelId = "amazon.nova-micro-v1:0";
     }
 
-    async analyze(instanceConfig) {
+    async analyze(instanceConfig, credentials) {
+        if (!credentials) throw new Error("AWS Credentials are required");
         console.log(`[EC2ComplianceReasoner] Analyzing config for: ${instanceConfig.instance_id}`);
+
+        const clientConfig = {
+            region: credentials.region || "us-east-1",
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        };
+        const bedrock = new BedrockRuntimeClient(clientConfig);
 
         const prompt = `
       You are an expert Cloud Security Compliance Officer.
@@ -56,7 +65,7 @@ class EC2ComplianceReasonerAgent {
 
             // REAL BEDROCK CALL
             try {
-                const response = await this.bedrock.send(command);
+                const response = await bedrock.send(command);
                 const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
                 let textContent = responseBody.output.message.content[0].text;

@@ -2,30 +2,37 @@ const {
     EC2Client,
     DescribeInstancesCommand,
     DescribeSecurityGroupsCommand,
-    DescribeVolumesCommand
+    DescribeVolumesCommand,
+    DescribeRegionsCommand
 } = require("@aws-sdk/client-ec2");
 
 class EC2ScannerAgent {
-    constructor() {
-        this.defaultRegion = process.env.AWS_REGION || "us-east-1";
-        this.ec2 = new EC2Client({ region: this.defaultRegion });
-    }
 
     /**
      * Scan a single EC2 instance by its Instance ID.
      * Gathers security-relevant configuration data.
      */
-    async scanInstance(instanceId) {
+    async scanInstance(instanceId, credentials) {
         if (!instanceId) throw new Error("Instance ID is required");
+        if (!credentials) throw new Error("AWS Credentials are required");
 
         console.log(`[EC2ScannerAgent] Scanning instance: ${instanceId}`);
+
+        const clientConfig = {
+            region: region,
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        };
+        const ec2Client = new EC2Client(clientConfig);
 
         try {
             // STEP 1: Describe the Instance
             const describeCommand = new DescribeInstancesCommand({
                 InstanceIds: [instanceId]
             });
-            const describeResponse = await this.ec2.send(describeCommand);
+            const describeResponse = await ec2Client.send(describeCommand);
 
             const reservations = describeResponse.Reservations || [];
             if (reservations.length === 0 || reservations[0].Instances.length === 0) {
@@ -38,7 +45,7 @@ class EC2ScannerAgent {
             const config = {
                 instance_id: instance.InstanceId,
                 scan_time: new Date().toISOString(),
-                region: this.defaultRegion,
+                region: region,
                 state: instance.State?.Name || "unknown",
                 instance_type: instance.InstanceType,
                 platform: instance.PlatformDetails || instance.Platform || "Linux/UNIX",
@@ -80,7 +87,7 @@ class EC2ScannerAgent {
                     const sgCommand = new DescribeSecurityGroupsCommand({
                         GroupIds: sgIds
                     });
-                    const sgResponse = await this.ec2.send(sgCommand);
+                    const sgResponse = await ec2Client.send(sgCommand);
 
                     config.security_groups = (sgResponse.SecurityGroups || []).map(sg => ({
                         group_id: sg.GroupId,
@@ -118,7 +125,7 @@ class EC2ScannerAgent {
                     const volCommand = new DescribeVolumesCommand({
                         VolumeIds: volumeIds
                     });
-                    const volResponse = await this.ec2.send(volCommand);
+                    const volResponse = await ec2Client.send(volCommand);
 
                     config.ebs_volumes = (volResponse.Volumes || []).map(vol => ({
                         volume_id: vol.VolumeId,
@@ -141,49 +148,87 @@ class EC2ScannerAgent {
     }
 
     /**
-     * Scan all running EC2 instances in the configured region.
+     * Scan all running EC2 instances across all available AWS regions.
      * Returns an array of instance configs.
      */
-    async scanAllInstances() {
-        console.log(`[EC2ScannerAgent] Scanning all running instances in ${this.defaultRegion}...`);
+    async scanAllInstances(credentials) {
+        if (!credentials) throw new Error("AWS Credentials are required");
+
+        const defaultRegion = "us-east-1"; // Base region for API calls like DescribeRegions
+        const baseClientConfig = {
+            region: defaultRegion,
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        };
+
+        const baseEc2Client = new EC2Client(baseClientConfig);
+        let regionsToScan = [defaultRegion];
 
         try {
-            const command = new DescribeInstancesCommand({
-                Filters: [{ Name: "instance-state-name", Values: ["running"] }]
+            console.log("[EC2ScannerAgent] Discovering all available AWS regions...");
+            const describeRegionsCommand = new DescribeRegionsCommand({
+                AllRegions: false // Only regions that are enabled for the account
             });
-            const response = await this.ec2.send(command);
+            const regionResponse = await baseEc2Client.send(describeRegionsCommand);
 
-            const instanceIds = [];
-            for (const reservation of (response.Reservations || [])) {
-                for (const instance of (reservation.Instances || [])) {
-                    instanceIds.push(instance.InstanceId);
-                }
+            if (regionResponse.Regions && regionResponse.Regions.length > 0) {
+                regionsToScan = regionResponse.Regions.map(r => r.RegionName);
+                console.log(`[EC2ScannerAgent] Discovered ${regionsToScan.length} enabled regions.`);
             }
-
-            if (instanceIds.length === 0) {
-                console.log("[EC2ScannerAgent] No running instances found.");
-                return [];
-            }
-
-            console.log(`[EC2ScannerAgent] Found ${instanceIds.length} running instance(s). Scanning each...`);
-
-            const results = [];
-            for (const id of instanceIds) {
-                try {
-                    const config = await this.scanInstance(id);
-                    results.push(config);
-                } catch (err) {
-                    console.warn(`[EC2ScannerAgent] Failed to scan ${id}: ${err.message}`);
-                    results.push({ instance_id: id, error: err.message });
-                }
-            }
-
-            return results;
-
         } catch (error) {
-            console.error(`[EC2ScannerAgent] Error listing instances: ${error.message}`);
-            throw error;
+            console.warn(`[EC2ScannerAgent] Failed to Discover Regions: ${error.message}. Defaulting to us-east-1.`);
         }
+
+        const results = [];
+
+        for (const region of regionsToScan) {
+            console.log(`\n[EC2ScannerAgent] Scanning region: ${region}`);
+
+            const regionalClientConfig = {
+                ...baseClientConfig,
+                region: region
+            };
+            const ec2Client = new EC2Client(regionalClientConfig);
+
+            try {
+                const command = new DescribeInstancesCommand({
+                    Filters: [{ Name: "instance-state-name", Values: ["running"] }]
+                });
+                const response = await ec2Client.send(command);
+
+                const instanceIds = [];
+                for (const reservation of (response.Reservations || [])) {
+                    for (const instance of (reservation.Instances || [])) {
+                        instanceIds.push(instance.InstanceId);
+                    }
+                }
+
+                if (instanceIds.length === 0) {
+                    console.log(`[EC2ScannerAgent] No running instances found in ${region}.`);
+                    continue;
+                }
+
+                console.log(`[EC2ScannerAgent] Found ${instanceIds.length} running instance(s) in ${region}. Scanning each...`);
+
+                for (const id of instanceIds) {
+                    try {
+                        // Pass region explicitly to scanInstance by injecting it into credentials object tempoarily
+                        const config = await this.scanInstance(id, { ...credentials, region });
+                        results.push(config);
+                    } catch (err) {
+                        console.warn(`[EC2ScannerAgent] Failed to scan ${id} in ${region}: ${err.message}`);
+                        results.push({ instance_id: id, region: region, error: err.message });
+                    }
+                }
+
+            } catch (error) {
+                console.warn(`[EC2ScannerAgent] Error listing instances in ${region}: ${error.message}`);
+            }
+        }
+
+        return results;
     }
 }
 

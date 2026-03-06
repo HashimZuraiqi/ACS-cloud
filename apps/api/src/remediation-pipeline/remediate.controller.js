@@ -22,6 +22,11 @@ exports.generatePlan = async (req, res) => {
 exports.approveFix = async (req, res) => {
     console.log("[Remediation] S3 Fix Request:", JSON.stringify(req.body));
     const { scanId } = req.body;
+    const credentials = req.user?.awsCredentials;
+
+    if (!credentials) {
+        return res.status(403).json({ error: "Missing AWS Credentials. Please update your Settings." });
+    }
 
     if (!scanId) {
         return res.status(400).json({ error: "scanId is required" });
@@ -45,14 +50,15 @@ exports.approveFix = async (req, res) => {
         const plan = planner.createPlan(scanResult.Item);
         console.log(`[Remediation] Plan has ${plan.steps.length} steps`);
 
-        // 3. Execute remediation
-        const executionResults = await executor.executePlan(plan, bucketName);
+        // 3. Execute remediation in the correct region
+        const regionalCredentials = { ...credentials, region: scanResult.Item.region };
+        const executionResults = await executor.executePlan(plan, bucketName, regionalCredentials);
         console.log(`[Remediation] Execution complete:`, executionResults);
 
         // 4. Rescan the bucket
         console.log(`[Remediation] Rescanning ${bucketName}...`);
-        const newRawConfig = await scannerAgent.scanBucket(bucketName);
-        const newAnalysis = await complianceReasoner.analyze(newRawConfig);
+        const newRawConfig = await scannerAgent.scanBuckets(credentials, bucketName).then(res => res[0]);
+        const newAnalysis = await complianceReasoner.analyze(newRawConfig, credentials);
         const newScore = riskScorer.calculate(newAnalysis);
 
         // 5. Save new scan to DB
@@ -95,6 +101,11 @@ exports.approveFix = async (req, res) => {
 exports.approveEC2Fix = async (req, res) => {
     console.log("[Remediation] EC2 Fix Request:", JSON.stringify(req.body));
     const { scanId } = req.body;
+    const credentials = req.user?.awsCredentials;
+
+    if (!credentials) {
+        return res.status(403).json({ error: "Missing AWS Credentials. Please update your Settings." });
+    }
 
     if (!scanId) {
         return res.status(400).json({ error: "scanId is required" });
@@ -118,14 +129,15 @@ exports.approveEC2Fix = async (req, res) => {
         const plan = planner.createEC2Plan(scanResult.Item);
         console.log(`[Remediation] EC2 Plan has ${plan.steps.length} steps`);
 
-        // 3. Execute remediation
-        const executionResults = await ec2Executor.executePlan(plan, instanceId);
+        // 3. Execute remediation in the correct region
+        const regionalCredentials = { ...credentials, region: scanResult.Item.region };
+        const executionResults = await ec2Executor.executePlan(plan, instanceId, regionalCredentials);
         console.log(`[Remediation] EC2 Execution complete:`, executionResults);
 
         // 4. Rescan the instance
         console.log(`[Remediation] Rescanning ${instanceId}...`);
-        const newRawConfig = await ec2ScannerAgent.scanInstance(instanceId);
-        const newAnalysis = await ec2ComplianceReasoner.analyze(newRawConfig);
+        const newRawConfig = await ec2ScannerAgent.scanInstance(instanceId, regionalCredentials);
+        const newAnalysis = await ec2ComplianceReasoner.analyze(newRawConfig, credentials);
         const newScore = riskScorer.calculate(newAnalysis);
 
         // 5. Save new scan to DB

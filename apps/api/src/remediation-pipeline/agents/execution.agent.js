@@ -12,29 +12,35 @@ const {
 } = require("@aws-sdk/client-s3");
 
 class ExecutionAgent {
-    constructor() {
-        this.defaultRegion = process.env.AWS_REGION || "us-east-1";
-        this.s3 = new S3Client({ region: this.defaultRegion });
-    }
 
     /**
      * Get a region-aware S3 client for the given bucket.
      */
-    async _getClientForBucket(bucketName) {
-        let region = this.defaultRegion;
-        let s3Client = this.s3;
+    async _getClientForBucket(bucketName, credentials) {
+        if (!credentials) throw new Error("AWS Credentials are required");
+        let region = credentials.region || "us-east-1";
+
+        const clientConfig = {
+            region: region,
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        };
+
+        let s3Client = new S3Client(clientConfig);
 
         try {
-            const locationData = await this.s3.send(
+            const locationData = await s3Client.send(
                 new GetBucketLocationCommand({ Bucket: bucketName })
             );
             if (locationData.LocationConstraint) {
                 region = locationData.LocationConstraint;
                 if (region === 'EU') region = 'eu-west-1';
             }
-            if (region !== this.defaultRegion) {
+            if (region !== clientConfig.region) {
                 console.log(`[ExecutionAgent] Bucket is in ${region}. Switching client.`);
-                s3Client = new S3Client({ region });
+                s3Client = new S3Client({ ...clientConfig, region });
             }
         } catch (err) {
             console.warn(`[ExecutionAgent] Could not determine region: ${err.message}. Using default.`);
@@ -43,10 +49,10 @@ class ExecutionAgent {
         return { s3Client, region };
     }
 
-    async executePlan(plan, bucketName) {
+    async executePlan(plan, bucketName, credentials) {
         console.log(`[ExecutionAgent] Executing ${plan.steps.length} step(s) for ${bucketName}`);
 
-        const { s3Client } = await this._getClientForBucket(bucketName);
+        const { s3Client } = await this._getClientForBucket(bucketName, credentials);
         const results = [];
 
         for (const step of plan.steps) {

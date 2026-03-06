@@ -20,6 +20,18 @@ const ensureTables = async () => {
                 KeySchema: [{ AttributeName: "scan_id", KeyType: "HASH" }],
                 AttributeDefinitions: [{ AttributeName: "scan_id", AttributeType: "S" }],
                 ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+            },
+            {
+                TableName: "CloudGuard_EC2_Scans",
+                KeySchema: [{ AttributeName: "scan_id", KeyType: "HASH" }],
+                AttributeDefinitions: [{ AttributeName: "scan_id", AttributeType: "S" }],
+                ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+            },
+            {
+                TableName: "CloudGuard_IAM_Scans",
+                KeySchema: [{ AttributeName: "scan_id", KeyType: "HASH" }],
+                AttributeDefinitions: [{ AttributeName: "scan_id", AttributeType: "S" }],
+                ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
             }
         ];
 

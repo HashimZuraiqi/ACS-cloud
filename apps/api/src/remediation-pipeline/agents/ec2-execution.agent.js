@@ -8,18 +8,25 @@ const {
 } = require("@aws-sdk/client-ec2");
 
 class EC2ExecutionAgent {
-    constructor() {
-        this.defaultRegion = process.env.AWS_REGION || "us-east-1";
-        this.ec2 = new EC2Client({ region: this.defaultRegion });
-    }
 
-    async executePlan(plan, instanceId) {
-        console.log(`[EC2Exec] ── Executing ${plan.steps.length} step(s) for ${instanceId} (region: ${this.defaultRegion})`);
+    async executePlan(plan, instanceId, credentials) {
+        if (!credentials) throw new Error("AWS Credentials are required");
+        const region = credentials.region || "us-east-1";
+        console.log(`[EC2Exec] ── Executing ${plan.steps.length} step(s) for ${instanceId} (region: ${region})`);
+
+        const clientConfig = {
+            region: region,
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        };
+        const ec2Client = new EC2Client(clientConfig);
 
         const results = [];
         for (const step of plan.steps) {
             try {
-                const result = await this._executeStep(step, instanceId);
+                const result = await this._executeStep(step, instanceId, ec2Client);
                 results.push(result);
                 console.log(`[EC2Exec] ${result.status === 'SUCCESS' ? '✓' : result.status === 'FAILED' ? '✗' : '⚠'} ${step.action}: ${result.message}`);
             } catch (error) {
@@ -31,16 +38,16 @@ class EC2ExecutionAgent {
         return results;
     }
 
-    async _executeStep(step, instanceId) {
+    async _executeStep(step, instanceId, ec2Client) {
         switch (step.action) {
             case "ENFORCE_IMDSV2":
-                return await this._enforceImdsv2(instanceId);
+                return await this._enforceImdsv2(instanceId, ec2Client);
             case "ENABLE_MONITORING":
-                return await this._enableMonitoring(instanceId);
+                return await this._enableMonitoring(instanceId, ec2Client);
             case "RESTRICT_SSH":
-                return await this._restrictSSH(instanceId);
+                return await this._restrictSSH(instanceId, ec2Client);
             case "RESTRICT_SECURITY_GROUPS":
-                return await this._restrictSecurityGroups(instanceId);
+                return await this._restrictSecurityGroups(instanceId, ec2Client);
             case "ENCRYPT_EBS_VOLUMES":
                 return {
                     action: "ENCRYPT_EBS_VOLUMES",
@@ -54,8 +61,8 @@ class EC2ExecutionAgent {
 
     // ─── IMDSV2 ──────────────────────────────────────────────────────
 
-    async _enforceImdsv2(instanceId) {
-        await this.ec2.send(new ModifyInstanceMetadataOptionsCommand({
+    async _enforceImdsv2(instanceId, ec2Client) {
+        await ec2Client.send(new ModifyInstanceMetadataOptionsCommand({
             InstanceId: instanceId,
             HttpTokens: "required",
             HttpEndpoint: "enabled",
@@ -63,7 +70,7 @@ class EC2ExecutionAgent {
         }));
 
         // Verify
-        const instance = await this._describeInstance(instanceId);
+        const instance = await this._describeInstance(instanceId, ec2Client);
         const tokens = instance.MetadataOptions?.HttpTokens;
         if (tokens === "required") {
             return { action: "ENFORCE_IMDSV2", status: "SUCCESS", message: "IMDSv2 enforced — verified HttpTokens='required'" };
@@ -73,8 +80,8 @@ class EC2ExecutionAgent {
 
     // ─── MONITORING ──────────────────────────────────────────────────
 
-    async _enableMonitoring(instanceId) {
-        const result = await this.ec2.send(new MonitorInstancesCommand({
+    async _enableMonitoring(instanceId, ec2Client) {
+        const result = await ec2Client.send(new MonitorInstancesCommand({
             InstanceIds: [instanceId]
         }));
         const state = result.InstanceMonitorings?.[0]?.Monitoring?.State;
@@ -87,15 +94,15 @@ class EC2ExecutionAgent {
 
     // ─── RESTRICT SSH ────────────────────────────────────────────────
 
-    async _restrictSSH(instanceId) {
-        const sgIds = await this._getInstanceSecurityGroups(instanceId);
+    async _restrictSSH(instanceId, ec2Client) {
+        const sgIds = await this._getInstanceSecurityGroups(instanceId, ec2Client);
         console.log(`[EC2Exec] SSH: checking ${sgIds.length} SG(s): ${sgIds.join(', ')}`);
 
         const removedFrom = [];
         const failedOn = [];
 
         for (const sgId of sgIds) {
-            const sg = await this._describeSecurityGroup(sgId);
+            const sg = await this._describeSecurityGroup(sgId, ec2Client);
             if (!sg) continue;
 
             for (const rule of (sg.IpPermissions || [])) {
@@ -122,13 +129,13 @@ class EC2ExecutionAgent {
                 console.log(`[EC2Exec] SSH: revoking on ${sgId} — ${JSON.stringify(revokePermission)}`);
 
                 try {
-                    await this.ec2.send(new RevokeSecurityGroupIngressCommand({
+                    await ec2Client.send(new RevokeSecurityGroupIngressCommand({
                         GroupId: sgId,
                         IpPermissions: [revokePermission]
                     }));
 
                     // ── VERIFY the rule was actually removed ──
-                    const verified = await this._verifyRuleRemoved(sgId, 22, "0.0.0.0/0");
+                    const verified = await this._verifyRuleRemoved(sgId, 22, "0.0.0.0/0", ec2Client);
                     if (verified) {
                         removedFrom.push(sgId);
                         console.log(`[EC2Exec] SSH: ✓ verified removed from ${sgId}`);
@@ -138,7 +145,7 @@ class EC2ExecutionAgent {
                         // Attempt revoking each IpRange individually
                         for (const ipRange of publicIpv4) {
                             try {
-                                await this.ec2.send(new RevokeSecurityGroupIngressCommand({
+                                await ec2Client.send(new RevokeSecurityGroupIngressCommand({
                                     GroupId: sgId,
                                     IpPermissions: [{
                                         IpProtocol: "tcp",
@@ -152,7 +159,7 @@ class EC2ExecutionAgent {
                             }
                         }
                         // Re-verify
-                        const verified2 = await this._verifyRuleRemoved(sgId, 22, "0.0.0.0/0");
+                        const verified2 = await this._verifyRuleRemoved(sgId, 22, "0.0.0.0/0", ec2Client);
                         if (verified2) {
                             removedFrom.push(sgId);
                             console.log(`[EC2Exec] SSH: ✓ verified removed from ${sgId} (fallback)`);
@@ -179,14 +186,14 @@ class EC2ExecutionAgent {
 
     // ─── RESTRICT DANGEROUS SECURITY GROUP RULES ─────────────────────
 
-    async _restrictSecurityGroups(instanceId) {
-        const sgIds = await this._getInstanceSecurityGroups(instanceId);
+    async _restrictSecurityGroups(instanceId, ec2Client) {
+        const sgIds = await this._getInstanceSecurityGroups(instanceId, ec2Client);
         const dangerousPorts = [3389, 3306, 5432, 1433, 27017, 6379];
         const removedRules = [];
         const failedRules = [];
 
         for (const sgId of sgIds) {
-            const sg = await this._describeSecurityGroup(sgId);
+            const sg = await this._describeSecurityGroup(sgId, ec2Client);
             if (!sg) continue;
 
             for (const rule of (sg.IpPermissions || [])) {
@@ -209,7 +216,7 @@ class EC2ExecutionAgent {
 
                 console.log(`[EC2Exec] SG: revoking ${ruleDesc} on ${sgId}`);
                 try {
-                    await this.ec2.send(new RevokeSecurityGroupIngressCommand({
+                    await ec2Client.send(new RevokeSecurityGroupIngressCommand({
                         GroupId: sgId,
                         IpPermissions: [revokePermission]
                     }));
@@ -232,18 +239,18 @@ class EC2ExecutionAgent {
 
     // ─── HELPERS ─────────────────────────────────────────────────────
 
-    async _describeInstance(instanceId) {
-        const response = await this.ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
+    async _describeInstance(instanceId, ec2Client) {
+        const response = await ec2Client.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
         return response.Reservations?.[0]?.Instances?.[0];
     }
 
-    async _describeSecurityGroup(sgId) {
-        const response = await this.ec2.send(new DescribeSecurityGroupsCommand({ GroupIds: [sgId] }));
+    async _describeSecurityGroup(sgId, ec2Client) {
+        const response = await ec2Client.send(new DescribeSecurityGroupsCommand({ GroupIds: [sgId] }));
         return response.SecurityGroups?.[0];
     }
 
-    async _getInstanceSecurityGroups(instanceId) {
-        const instance = await this._describeInstance(instanceId);
+    async _getInstanceSecurityGroups(instanceId, ec2Client) {
+        const instance = await this._describeInstance(instanceId, ec2Client);
         if (!instance) throw new Error(`Instance ${instanceId} not found`);
         return (instance.SecurityGroups || []).map(sg => sg.GroupId);
     }
@@ -252,8 +259,8 @@ class EC2ExecutionAgent {
      * Verify that a rule allowing a specific port from a specific CIDR was actually removed.
      * Returns true if the rule is gone, false if it still exists.
      */
-    async _verifyRuleRemoved(sgId, port, cidr) {
-        const sg = await this._describeSecurityGroup(sgId);
+    async _verifyRuleRemoved(sgId, port, cidr, ec2Client) {
+        const sg = await this._describeSecurityGroup(sgId, ec2Client);
         if (!sg) return true;
 
         for (const rule of (sg.IpPermissions || [])) {

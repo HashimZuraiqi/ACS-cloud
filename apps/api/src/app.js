@@ -4,8 +4,10 @@ const bodyParser = require('body-parser');
 
 const scanRoutes = require('./scan-pipeline/scan.routes');
 const ec2ScanRoutes = require('./scan-pipeline/ec2-scan.routes');
+const iamScanRoutes = require('./scan-pipeline/iam-scan.routes');
 const remediateRoutes = require('./remediation-pipeline/remediate.routes');
 const authRoutes = require('./auth/auth.routes');
+const { verifyToken } = require('./middleware/auth.middleware');
 
 const app = express();
 
@@ -15,9 +17,10 @@ app.use(bodyParser.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/scan', scanRoutes);
-app.use('/api/ec2-scan', ec2ScanRoutes);
-app.use('/api/remediate', remediateRoutes);
+app.use('/api/scan', verifyToken, scanRoutes);
+app.use('/api/ec2-scan', verifyToken, ec2ScanRoutes);
+app.use('/api/iam-scan', verifyToken, iamScanRoutes);
+app.use('/api/remediate', verifyToken, remediateRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

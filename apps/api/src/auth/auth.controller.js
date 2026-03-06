@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { docClient } = require('../config/db');
-const { PutCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
+const { PutCommand, GetCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const { encrypt } = require('../utils/encryption');
 
 const TABLE_NAME = "CloudGuard_Users"; // Ensure this table exists in DynamoDB
 const JWT_SECRET = process.env.JWT_SECRET || "default_super_secret_for_dev";
@@ -120,5 +121,44 @@ exports.getMe = async (req, res) => {
         res.json(safeUser);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+exports.updateAwsCredentials = async (req, res) => {
+    const email = req.user?.email;
+    const { accessKeyId, secretAccessKey } = req.body;
+
+    if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+    if (!accessKeyId || !secretAccessKey) {
+        return res.status(400).json({ error: "Missing AWS credentials fields (accessKeyId, secretAccessKey)" });
+    }
+
+    try {
+        const encryptedAccessKeyId = encrypt(accessKeyId);
+        const encryptedSecretAccessKey = encrypt(secretAccessKey);
+
+        if (!encryptedAccessKeyId || !encryptedSecretAccessKey) {
+            return res.status(500).json({ error: "Encryption failed internally" });
+        }
+
+        const command = new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { email },
+            UpdateExpression: "set awsCredentials = :creds",
+            ExpressionAttributeValues: {
+                ":creds": {
+                    accessKeyId: encryptedAccessKeyId,
+                    secretAccessKey: encryptedSecretAccessKey
+                }
+            }
+        });
+
+        await docClient.send(command);
+        res.json({ message: "AWS credentials successfully saved and encrypted" });
+
+    } catch (error) {
+        console.error("Update AWS Credentials Error:", error);
+        res.status(500).json({ error: "Failed to update AWS credentials" });
     }
 };
