@@ -8,6 +8,7 @@ import Sidebar from '@/components/Sidebar.jsx';
 import ProtectedHeader from '@/components/ProtectedHeader.jsx';
 import Dashboard from '@/pages/Dashboard.jsx';
 import BucketDetail from '@/pages/BucketDetail.jsx';
+import EC2Detail from '@/pages/EC2Detail.jsx';
 import ActivityLog from '@/pages/ActivityLog.jsx';
 import Landing from '@/pages/Landing.jsx';
 import Login from '@/pages/Login.jsx';
@@ -97,6 +98,7 @@ function App() {
               }>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/bucket/:scanId" element={<BucketDetail />} />
+                <Route path="/ec2/:scanId" element={<EC2Detail />} />
                 <Route path="/activity" element={<ActivityLog />} />
                 <Route path="/history" element={<Navigate to="/activity" replace />} />
                 <Route path="/settings" element={<Settings />} />
