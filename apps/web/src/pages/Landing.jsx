@@ -47,13 +47,13 @@ const stagger = {
 /* ── Animated Section Card ── */
 const SectionCard = ({ children, className = '', id }) => {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: false, amount: 0.25 })
+  const isInView = useInView(ref, { once: false, amount: 0.15 })
 
   return (
     <section
       id={id}
       ref={ref}
-      className={`snap-section relative min-h-[100dvh] w-full flex items-center justify-center p-6 ${className}`}
+      className={`snap-section relative min-h-[100dvh] w-full flex items-center justify-center py-16 sm:py-24 px-4 sm:px-6 md:px-8 overflow-y-auto sm:overflow-hidden ${className}`}
     >
       <motion.div
         variants={stagger}
@@ -81,13 +81,13 @@ const Landing = () => {
 
   return (
     <div className="snap-container w-full bg-background text-foreground">
-      {/* Fixed header overlaying snap container */}
+      {/* Fixed header overlaying container */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <PublicHeader />
       </div>
 
       {/* ═══════════════ HERO ═══════════════ */}
-      <section className="snap-section relative min-h-[100dvh] flex items-center justify-center overflow-hidden">
+      <section className="snap-section relative min-h-[100dvh] flex items-center justify-center overflow-x-hidden overflow-y-auto sm:overflow-hidden pt-20 pb-12">
         {/* Animated orbs */}
         <div className="pointer-events-none absolute inset-0">
           <motion.div
@@ -133,10 +133,10 @@ const Landing = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-background" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-6 text-center pt-16 z-10">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center pt-12 sm:pt-24 pb-12 sm:pb-24 z-10 w-full mt-0 sm:-mt-16">
           {/* Badge */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}
-            className="inline-flex items-center gap-2.5 px-5 py-2 mb-8 rounded-full border border-white/10 bg-white/5 backdrop-blur-md text-xs font-medium text-muted-foreground shadow-lg shadow-black/5 hover:bg-white/10 transition-colors cursor-default">
+            className="inline-flex items-center gap-2 sm:gap-2.5 px-3 sm:px-5 py-1.5 sm:py-2 mb-4 sm:mb-8 rounded-full border border-white/10 bg-white/5 backdrop-blur-md text-[10px] sm:text-xs font-medium text-muted-foreground shadow-lg shadow-black/5 hover:bg-white/10 transition-colors cursor-default">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -146,30 +146,30 @@ const Landing = () => {
 
           {/* Heading */}
           <motion.h1 initial="hidden" animate="visible" variants={fadeUp} custom={1}
-            className="text-5xl sm:text-6xl lg:text-8xl font-black tracking-tight leading-[1] mb-8 drop-shadow-sm">
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tight leading-[1.1] sm:leading-[1] mb-4 sm:mb-6 drop-shadow-sm">
             Cloud Security,
             <br />
-            <span className="bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-500 dark:from-blue-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent pb-2">
+            <span className="bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-500 dark:from-blue-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent pb-1 sm:pb-2 inline-block">
               Reimagined
             </span>
           </motion.h1>
 
           <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={2}
-            className="max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground/80 leading-relaxed mb-12 font-light">
+            className="max-w-2xl mx-auto text-sm sm:text-lg lg:text-xl text-muted-foreground/80 leading-relaxed mb-6 sm:mb-8 font-light px-2 sm:px-0">
             Autonomous S3 bucket scanning, AI&#8209;powered compliance reasoning, and
             one&#8209;click remediation — all in a single platform.
           </motion.p>
 
           {/* CTAs */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={3}
-            className="flex flex-wrap items-center justify-center gap-5 mb-16">
-            <Link to="/signup">
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 mb-10 sm:mb-12 w-full">
+            <Link to="/signup" className="w-full sm:w-auto">
               <motion.button
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className="group relative px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-xl shadow-blue-600/30 hover:shadow-blue-600/50 transition-all duration-300 text-sm overflow-hidden"
+                className="group relative px-8 py-3.5 sm:py-4 w-full sm:w-auto justify-center rounded-2xl font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-xl shadow-blue-600/30 hover:shadow-blue-600/50 transition-all duration-300 text-sm overflow-hidden flex items-center"
               >
-                <span className="relative z-10 flex items-center">
+                <span className="relative z-10 flex items-center justify-center">
                   Get Started Free
                   <ArrowRight className="inline-block ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </span>
@@ -180,19 +180,19 @@ const Landing = () => {
               onClick={handleTryDemo}
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.98 }}
-              className="group px-8 py-4 rounded-2xl font-bold border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 text-sm shadow-lg hover:shadow-xl"
+              className="group px-8 py-3.5 sm:py-4 w-full sm:w-auto flex items-center justify-center rounded-2xl font-bold border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 text-sm shadow-lg hover:shadow-xl"
             >
               Try Live Demo
-              <ArrowRight className="inline-block ml-2 w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-blue-400" />
+              <ArrowRight className="inline-block ml-2 w-4 h-4 sm:opacity-0 sm:-translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-blue-400" />
             </motion.button>
           </motion.div>
 
           {/* Trust */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={4}
-            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-xs font-medium text-muted-foreground/60">
+            className="flex flex-wrap items-center justify-center gap-2 sm:gap-x-6 lg:gap-x-8 sm:gap-y-4 text-[10px] sm:text-xs font-medium text-muted-foreground/60 w-full mb-12 sm:mb-0">
             {['SOC 2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO 27001'].map((s) => (
-              <span key={s} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {s}
+              <span key={s} className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/5 border border-white/5 whitespace-nowrap">
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" /> {s}
               </span>
             ))}
           </motion.div>
@@ -200,7 +200,7 @@ const Landing = () => {
 
         {/* Scroll hint */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
+          className="absolute bottom-4 sm:bottom-10 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2 sm:gap-3">
           <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/40 font-semibold">Scroll</span>
           <motion.div
             animate={{ y: [0, 10, 0], opacity: [0.5, 1, 0.5] }}
@@ -228,43 +228,44 @@ const Landing = () => {
             </motion.p>
           </motion.div>
 
-          <motion.div variants={stagger} className="grid md:grid-cols-3 gap-8">
-            <motion.div variants={scaleIn} custom={0} className="p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
-              <div className="mx-auto w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
-                <AlertTriangle className="w-10 h-10 text-red-500" />
+          <motion.div variants={stagger} className="grid md:grid-cols-3 gap-4 sm:gap-8">
+            <motion.div variants={scaleIn} custom={0} className="p-6 sm:p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
+              <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4 sm:mb-6">
+                <AlertTriangle className="w-8 h-8 sm:w-10 sm:h-10 text-red-500" />
               </div>
-              <div className="text-5xl font-black text-foreground mb-2">93%</div>
-              <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Misconfiguration</div>
-              <p className="text-muted-foreground leading-relaxed">of cloud breaches are caused by simple misconfigurations, not advanced hacks.</p>
+              <div className="text-3xl sm:text-5xl font-black text-foreground mb-1 sm:mb-2">93%</div>
+              <div className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-widest mb-2 sm:mb-4">Misconfiguration</div>
+              <p className="text-xs sm:text-base text-muted-foreground leading-relaxed">of cloud breaches are caused by simple misconfigurations, not advanced hacks.</p>
             </motion.div>
-            <motion.div variants={scaleIn} custom={1} className="p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
-              <div className="mx-auto w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center mb-6">
-                <Clock className="w-10 h-10 text-orange-500" />
+            <motion.div variants={scaleIn} custom={1} className="p-6 sm:p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
+              <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-orange-500/10 flex items-center justify-center mb-4 sm:mb-6">
+                <Clock className="w-8 h-8 sm:w-10 sm:h-10 text-orange-500" />
               </div>
-              <div className="text-5xl font-black text-foreground mb-2">200+ Days</div>
-              <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Exposure Time</div>
-              <p className="text-muted-foreground leading-relaxed">Average time it takes to detect a breach. By then, your data is long gone.</p>
+              <div className="text-3xl sm:text-5xl font-black text-foreground mb-1 sm:mb-2">200+ Days</div>
+              <div className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-widest mb-2 sm:mb-4">Exposure Time</div>
+              <p className="text-xs sm:text-base text-muted-foreground leading-relaxed">Average time it takes to detect a breach. By then, your data is long gone.</p>
             </motion.div>
-            <motion.div variants={scaleIn} custom={2} className="p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
-              <div className="mx-auto w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-6">
-                <DollarSign className="w-10 h-10 text-blue-500" />
+            <motion.div variants={scaleIn} custom={2} className="p-6 sm:p-8 rounded-3xl bg-card/40 border border-white/10 backdrop-blur-md text-center hover:bg-card/60 transition-colors">
+              <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-4 sm:mb-6">
+                <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-blue-500" />
               </div>
-              <div className="text-5xl font-black text-foreground mb-2">$4.45M</div>
-              <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Avg Cost</div>
-              <p className="text-muted-foreground leading-relaxed">The average cost of a data breach in 2024. Can your startup survive that?</p>
+              <div className="text-3xl sm:text-5xl font-black text-foreground mb-1 sm:mb-2">$4.45M</div>
+              <div className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-widest mb-2 sm:mb-4">Avg Cost</div>
+              <p className="text-xs sm:text-base text-muted-foreground leading-relaxed">The average cost of a data breach in 2024. Can your startup survive that?</p>
             </motion.div>
+  
           </motion.div>
         </div>
       </SectionCard>
 
       {/* ═══════════════ PIPELINE ═══════════════ */}
       <SectionCard id="pipeline">
-        <div className="max-w-6xl mx-auto px-6 w-full">
-          <motion.div variants={stagger} className="text-center mb-16 lg:mb-20">
+        <div className="max-w-6xl mx-auto px-6 w-full mt-10 sm:mt-0">
+          <motion.div variants={stagger} className="text-center mb-10 lg:mb-20">
             <motion.p variants={fadeUp}
-              className="text-sm font-semibold text-blue-500 uppercase tracking-[0.2em] mb-4">Pipeline</motion.p>
+              className="text-xs sm:text-sm font-semibold text-blue-500 uppercase tracking-[0.2em] mb-2 sm:mb-4">Pipeline</motion.p>
             <motion.h2 variants={fadeUp}
-              className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Five Steps to Total Security</motion.h2>
+              className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Five Steps to Total Security</motion.h2>
           </motion.div>
 
           <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-5">
@@ -325,7 +326,7 @@ const Landing = () => {
             ].map((f, i) => (
               <motion.div
                 key={i}
-                variants={slideLeft}
+                variants={scaleIn}
                 custom={i}
                 whileHover={{ y: -8, transition: { duration: 0.3 } }}
                 className="group relative p-7 rounded-2xl border border-border bg-card/80 backdrop-blur-sm hover:border-blue-500/30 hover:shadow-xl hover:shadow-blue-600/[0.06] transition-colors duration-500"
@@ -459,7 +460,7 @@ const Landing = () => {
               className="max-w-xl mx-auto text-muted-foreground text-lg">Five autonomous agents work in concert to secure your cloud.</motion.p>
           </motion.div>
 
-          <motion.div variants={stagger} className="flex flex-col lg:flex-row gap-4">
+          <motion.div variants={stagger} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {[
               { icon: ScanSearch, name: 'Scanner Agent', desc: 'Fetches and normalizes bucket configs, policies, and metadata from AWS.' },
               { icon: Cpu, name: 'Compliance Reasoner', desc: 'Nova 2 Lite analyzes violations across multiple compliance frameworks.' },

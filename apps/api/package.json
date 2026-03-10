@@ -9,6 +9,7 @@
     },
     "dependencies": {
         "@aws-sdk/client-bedrock-runtime": "^3.0.0",
+        "@aws-sdk/client-cloudwatch": "^3.1006.0",
         "@aws-sdk/client-dynamodb": "^3.0.0",
         "@aws-sdk/client-ec2": "^3.1002.0",
         "@aws-sdk/client-iam": "^3.1002.0",

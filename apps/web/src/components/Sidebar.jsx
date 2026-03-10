@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Activity, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const Sidebar = ({ className }) => {
+const Sidebar = ({ className, onCloseMobile }) => {
   const location = useLocation();
 
   const navItems = [
@@ -36,6 +36,7 @@ const Sidebar = ({ className }) => {
           const Icon = item.icon;
           return (
             <NavLink
+              onClick={onCloseMobile}
               key={item.to}
               to={item.to}
               end={item.end}

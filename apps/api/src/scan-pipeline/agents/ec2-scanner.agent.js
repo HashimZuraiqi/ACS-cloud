@@ -188,7 +188,7 @@ class EC2ScannerAgent {
 
             const regionalClientConfig = {
                 ...baseClientConfig,
-                region: region
+                region: region || 'us-east-1'
             };
             const ec2Client = new EC2Client(regionalClientConfig);
 

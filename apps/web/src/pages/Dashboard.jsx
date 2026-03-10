@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RefreshCw, Shield, AlertTriangle, CheckCircle2, Server, Database } from 'lucide-react';
+import { Search, RefreshCw, Shield, AlertTriangle, CheckCircle2, Server, Database, DollarSign, HardDrive } from 'lucide-react';
 import { api } from '@/services/api';
 import BucketTable from '@/components/BucketTable.jsx';
 import InstanceTable from '@/components/InstanceTable.jsx';
 import IAMTable from '@/components/IAMTable.jsx';
+import CostTable from '@/components/CostTable.jsx';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -60,6 +61,7 @@ const SERVICE_TABS = [
   { id: 's3', label: 'S3 Buckets', icon: Database, accent: 'from-blue-600 to-cyan-500' },
   { id: 'ec2', label: 'EC2 Instances', icon: Server, accent: 'from-orange-500 to-amber-500' },
   { id: 'iam', label: 'IAM Users', icon: Shield, accent: 'from-purple-500 to-fuchsia-500' },
+  { id: 'cost', label: 'Cost Optimizer', icon: DollarSign, accent: 'from-green-500 to-emerald-500' },
 ];
 
 const Dashboard = () => {
@@ -68,10 +70,10 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
-  const [serviceData, setServiceData] = useState({ s3: [], ec2: [], iam: [] });
-  const [serviceLoading, setServiceLoading] = useState({ s3: true, ec2: true, iam: true });
-  const [serviceError, setServiceError] = useState({ s3: null, ec2: null, iam: null });
-  const [serviceScanning, setServiceScanning] = useState({ s3: false, ec2: false, iam: false });
+  const [serviceData, setServiceData] = useState({ s3: [], ec2: [], iam: [], cost: [] });
+  const [serviceLoading, setServiceLoading] = useState({ s3: true, ec2: true, iam: true, cost: true });
+  const [serviceError, setServiceError] = useState({ s3: null, ec2: null, iam: null, cost: null });
+  const [serviceScanning, setServiceScanning] = useState({ s3: false, ec2: false, iam: false, cost: false });
 
   const updateServiceState = (service, key, value) => {
     if (key === 'data') {
@@ -164,6 +166,33 @@ const Dashboard = () => {
     }
   };
 
+  const fetchCostData = async () => {
+    try {
+      updateServiceState('cost', 'loading', true);
+      const data = await api.getCostScans();
+      const latestScan = data && data.length > 0 ? data[0] : null;
+      let mapped = [];
+      if (latestScan && latestScan.resources) {
+          mapped = latestScan.resources.map(r => ({
+              scanId: latestScan.scan_id,
+              resourceType: r.resource_type,
+              resourceId: r.resource_id,
+              region: r.region,
+              details: r.details,
+              estimatedCost: r.estimated_monthly_cost,
+              status: r.status
+          }));
+      }
+      updateServiceState('cost', 'data', mapped);
+      updateServiceState('cost', 'error', null);
+    } catch (err) {
+      updateServiceState('cost', 'error', 'Failed to load Cost scan data.');
+      console.error(err);
+    } finally {
+      updateServiceState('cost', 'loading', false);
+    }
+  };
+
   const fetchData = () => {
     if (activeService === 's3') {
       fetchS3Data();
@@ -171,6 +200,8 @@ const Dashboard = () => {
       fetchEC2Data();
     } else if (activeService === 'iam') {
       fetchIAMData();
+    } else if (activeService === 'cost') {
+      fetchCostData();
     }
   };
 
@@ -204,6 +235,13 @@ const Dashboard = () => {
           description: searchQuery.trim() ? `Scanned: ${searchQuery}` : "Scanned all IAM users",
           variant: "success"
         });
+      } else if (activeService === 'cost') {
+        await api.triggerCostScan();
+        toast({
+          title: "Cost Scan complete",
+          description: "Scanned account for wasted resources.",
+          variant: "success"
+        });
       }
       await fetchData();
       setSearchQuery('');
@@ -228,13 +266,39 @@ const Dashboard = () => {
   };
 
   const currentData = serviceData[activeService];
-  const totalResources = currentData.length;
-  const highRisk = currentData.filter(r => r.riskLevel === 'high' || r.riskLevel === 'critical').length;
-  const compliant = currentData.filter(r => r.status === 'compliant').length;
-  const resourceLabel = activeService === 's3' ? 'Total Buckets' : activeService === 'ec2' ? 'Total Instances' : 'Total Users';
   const currentLoading = serviceLoading[activeService];
   const currentError = serviceError[activeService];
   const currentScanning = serviceScanning[activeService];
+
+  const renderStats = () => {
+    if (activeService === 'cost') {
+      const totalWasted = currentData.length;
+      const zombieEbs = currentData.filter(r => r.resourceType === 'EBS Volume').length;
+      const idleEc2 = currentData.filter(r => r.resourceType === 'EC2 Instance').length;
+      
+      return (
+        <>
+          <StatCard icon={DollarSign} label="Total Wasted Resources" value={totalWasted} accent="bg-gradient-to-br from-green-500 to-emerald-600" delay={2} />
+          <StatCard icon={HardDrive} label="Zombie EBS Volumes" value={zombieEbs} accent="bg-gradient-to-br from-purple-500 to-fuchsia-600" delay={3} />
+          <StatCard icon={Server} label="Idle EC2 Instances" value={idleEc2} accent="bg-gradient-to-br from-orange-500 to-amber-600" delay={4} />
+        </>
+      );
+    }
+
+    const totalResources = currentData.length;
+    const highRisk = currentData.filter(r => r.riskLevel === 'high' || r.riskLevel === 'critical').length;
+    const compliant = currentData.filter(r => r.status === 'compliant').length;
+    const resourceLabel = activeService === 's3' ? 'Total Buckets' : activeService === 'ec2' ? 'Total Instances' : 'Total Users';
+
+    return (
+      <>
+        <StatCard icon={activeService === 's3' ? Shield : activeService === 'ec2' ? Server : Shield} label={resourceLabel} value={totalResources}
+          accent={activeService === 's3' ? "bg-gradient-to-br from-blue-500 to-blue-600" : activeService === 'ec2' ? "bg-gradient-to-br from-orange-500 to-amber-600" : "bg-gradient-to-br from-purple-500 to-fuchsia-600"} delay={2} />
+        <StatCard icon={AlertTriangle} label="High Risk" value={highRisk} accent="bg-gradient-to-br from-red-500 to-rose-600" delay={3} />
+        <StatCard icon={CheckCircle2} label="Compliant" value={compliant} accent="bg-gradient-to-br from-emerald-500 to-green-600" delay={4} />
+      </>
+    );
+  };
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)]">
@@ -250,8 +314,8 @@ const Dashboard = () => {
         </motion.div>
 
         {/* Service Tabs */}
-        <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0.5}>
-          <div className="inline-flex items-center p-1.5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-lg">
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0.5} className="overflow-x-auto pb-4 -mb-4 scrollbar-none">
+          <div className="inline-flex min-w-max items-center p-1.5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-lg">
             {SERVICE_TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeService === tab.id;
@@ -260,7 +324,7 @@ const Dashboard = () => {
                   key={tab.id}
                   onClick={() => setActiveService(tab.id)}
                   className={cn(
-                    'relative flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300',
+                    'relative flex items-center gap-2.5 px-4 md:px-5 py-2.5 rounded-xl text-[13px] md:text-sm font-semibold transition-all duration-300',
                     isActive
                       ? 'text-white shadow-lg'
                       : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -274,7 +338,7 @@ const Dashboard = () => {
                     />
                   )}
                   <Icon className="w-4 h-4 relative z-10" />
-                  <span className="relative z-10">{tab.label}</span>
+                  <span className="relative z-10 whitespace-nowrap">{tab.label}</span>
                 </button>
               );
             })}
@@ -283,27 +347,30 @@ const Dashboard = () => {
 
         {/* Scan bar */}
         <motion.form onSubmit={handleScan} initial="hidden" animate="visible" variants={fadeUp} custom={1}
-          className="max-w-2xl"
+          className="max-w-2xl w-full"
         >
           <div className="relative group p-[2px] rounded-2xl bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-blue-500/20 hover:from-blue-500/40 hover:via-cyan-500/40 hover:to-blue-500/40 transition-colors duration-500">
-            <div className="relative flex items-center bg-card/80 backdrop-blur-xl rounded-[14px]">
-              <Search className="absolute left-4 w-5 h-5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
-              <input
-                type="text"
-                placeholder={activeService === 's3' ? 'Enter S3 bucket name to scan...' : activeService === 'ec2' ? 'Enter EC2 Instance ID to scan (or leave empty for all)...' : 'Enter IAM username to scan (or leave empty for all)...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 text-base rounded-[14px]"
-              />
-              <div className="pr-2">
+            <div className="relative flex flex-col md:flex-row items-center bg-card/80 backdrop-blur-xl rounded-[14px] p-2 md:p-0 gap-3 md:gap-0">
+              <div className="relative w-full flex-1 flex items-center">
+                <Search className="absolute left-4 w-5 h-5 text-muted-foreground group-focus-within:text-blue-500 transition-colors" />
+                <input
+                  type="text"
+                  placeholder={activeService === 's3' ? 'Scan S3 bucket...' : activeService === 'ec2' ? 'Scan EC2 Instance ID...' : activeService === 'iam' ? 'Scan IAM user...' : 'Scan for Zombie Resources'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  readOnly={activeService === 'cost'}
+                  className="w-full pl-12 pr-4 py-3 md:py-4 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 text-sm md:text-base rounded-[14px]"
+                />
+              </div>
+              <div className="w-full md:w-auto md:pr-2 shrink-0 flex justify-end">
                 <button type="submit" disabled={currentScanning || (activeService === 's3' && !searchQuery)}
                   className={cn(
-                    "px-5 py-2.5 rounded-xl font-semibold text-sm text-white shadow-lg disabled:opacity-50 disabled:shadow-none transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2",
+                    "w-full md:w-48 justify-center px-5 py-3 md:py-2.5 rounded-xl font-semibold text-sm text-white shadow-lg disabled:opacity-50 disabled:shadow-none transition-all duration-300 hover:scale-[1.02] active:scale-95 flex items-center gap-2",
                     activeService === 's3'
                       ? "bg-gradient-to-r from-blue-600 to-cyan-500 shadow-blue-500/25 hover:shadow-blue-500/40"
-                      : activeService === 'ec2' ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-orange-500/40" : "bg-gradient-to-r from-purple-500 to-fuchsia-500 shadow-purple-500/25 hover:shadow-purple-500/40"
+                      : activeService === 'ec2' ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-orange-500/40" : activeService === 'iam' ? "bg-gradient-to-r from-purple-500 to-fuchsia-500 shadow-purple-500/25 hover:shadow-purple-500/40" : "bg-gradient-to-r from-green-500 to-emerald-500 shadow-green-500/25 hover:shadow-green-500/40"
                   )}>
-                  {currentScanning ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Scanning</>) : (<>Scan</>)}
+                  {currentScanning ? (<><RefreshCw className="w-4 h-4 animate-spin" /> Scanning</>) : (<>{activeService === 'cost' ? 'Run Cost Scan' : 'Start Scan'}</>)}
                 </button>
               </div>
             </div>
@@ -312,17 +379,14 @@ const Dashboard = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <StatCard icon={activeService === 's3' ? Shield : activeService === 'ec2' ? Server : Shield} label={resourceLabel} value={totalResources}
-            accent={activeService === 's3' ? "bg-gradient-to-br from-blue-500 to-blue-600" : activeService === 'ec2' ? "bg-gradient-to-br from-orange-500 to-amber-600" : "bg-gradient-to-br from-purple-500 to-fuchsia-600"} delay={2} />
-          <StatCard icon={AlertTriangle} label="High Risk" value={highRisk} accent="bg-gradient-to-br from-red-500 to-rose-600" delay={3} />
-          <StatCard icon={CheckCircle2} label="Compliant" value={compliant} accent="bg-gradient-to-br from-emerald-500 to-green-600" delay={4} />
+          {renderStats()}
         </div>
 
         {/* Table */}
         <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={5} className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xl font-bold text-foreground">
-              {activeService === 's3' ? 'Active Infrastructure' : activeService === 'ec2' ? 'EC2 Instances' : 'IAM Users'}
+              {activeService === 's3' ? 'Active Infrastructure' : activeService === 'ec2' ? 'EC2 Instances' : activeService === 'iam' ? 'IAM Users' : 'Wasted Resources'}
             </h2>
             <button onClick={fetchData} disabled={currentLoading}
               className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all hover:rotate-180 duration-500">
@@ -362,8 +426,10 @@ const Dashboard = () => {
                     <BucketTable buckets={serviceData.s3} />
                   ) : activeService === 'ec2' ? (
                     <InstanceTable instances={serviceData.ec2} />
-                  ) : (
+                  ) : activeService === 'iam' ? (
                     <IAMTable users={serviceData.iam} />
+                  ) : (
+                    <CostTable resources={serviceData.cost} />
                   )}
                 </motion.div>
               </AnimatePresence>

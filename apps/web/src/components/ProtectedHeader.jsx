@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Bell, Moon, Sun, Settings } from 'lucide-react';
+import { LogOut, User, Bell, Moon, Sun, Settings, Menu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const ProtectedHeader = () => {
+const ProtectedHeader = ({ onMobileMenuClick }) => {
   const { currentUser, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -26,14 +26,23 @@ const ProtectedHeader = () => {
   const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <header className="h-16 px-8 flex items-center justify-between sticky top-0 z-40">
+    <header className="h-16 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
       <div className="absolute inset-0 bg-card/40 backdrop-blur-md border-b border-white/5 -z-10" />
 
-      <h2 className="text-sm font-medium text-muted-foreground/80">
-        Welcome back, <span className="font-bold text-foreground bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent">{displayName}</span>
-      </h2>
-
       <div className="flex items-center gap-3">
+        <button 
+          onClick={onMobileMenuClick}
+          className="md:hidden p-2 -ml-2 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+
+        <h2 className="hidden sm:block text-sm font-medium text-muted-foreground/80">
+          Welcome back, <span className="font-bold text-foreground bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent">{displayName}</span>
+        </h2>
+      </div>
+
+      <div className="flex items-center gap-2 md:gap-3">
         {/* Notification */}
         <button className="relative p-2.5 rounded-xl hover:bg-white/5 transition-colors text-muted-foreground hover:text-foreground">
           <Bell className="w-5 h-5" />

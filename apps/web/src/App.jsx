@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -48,6 +48,8 @@ class ErrorBoundary extends React.Component {
 
 // Layout for protected routes
 const ProtectedLayout = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans relative">
       {/* Global Background Ambience */}
@@ -60,9 +62,24 @@ const ProtectedLayout = () => {
           className="absolute bottom-0 left-[20%] w-[700px] h-[400px] bg-purple-600/5 dark:bg-purple-600/5 blur-[130px] rounded-full mix-blend-screen" />
       </div>
 
-      <Sidebar className="hidden md:flex flex-shrink-0 z-20 relative" />
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Desktop & Mobile */}
+      <Sidebar 
+        className={`fixed md:relative top-0 left-0 h-full z-50 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        } flex-shrink-0`}
+        onCloseMobile={() => setMobileMenuOpen(false)} 
+      />
+
       <main className="flex-1 flex flex-col overflow-hidden z-10 relative">
-        <ProtectedHeader />
+        <ProtectedHeader onMobileMenuClick={() => setMobileMenuOpen(true)} />
         <div className="flex-1 overflow-y-auto p-4 md:p-8 max-w-7xl mx-auto w-full scrollbar-none">
           <motion.div
             initial={{ opacity: 0, y: 10 }}

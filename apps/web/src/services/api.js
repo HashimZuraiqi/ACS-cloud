@@ -115,5 +115,21 @@ export const api = {
     getIAMScanResult: async (scanId) => {
         const response = await client.get(`/iam-scan/${scanId}`);
         return response.data;
+    },
+
+    // Cost Optimizer Pipeline
+    triggerCostScan: async () => {
+        const response = await client.post('/cost-scan');
+        return response.data;
+    },
+
+    getCostScans: async () => {
+        const response = await client.get('/cost-scan');
+        return response.data;
+    },
+
+    getCostScanResult: async (scanId) => {
+        const response = await client.get(`/cost-scan/${scanId}`);
+        return response.data;
     }
 };
