@@ -2,7 +2,7 @@ const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-be
 
 class EC2ComplianceReasonerAgent {
     constructor() {
-        this.modelId = "amazon.nova-micro-v1:0";
+        this.modelId = "amazon.nova-lite-v1:0";
     }
 
     async analyze(instanceConfig, credentials) {

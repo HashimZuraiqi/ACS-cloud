@@ -125,8 +125,33 @@ npm run dev
 
 Visit `http://localhost:3000` (or the port prescribed by Vite) to view the AEGIS dashboard. Drop in your AWS Access Key ID & Secret Access Key into the dashboard onboarding, and let the AI scan begin.
 
-## Security Warning
-AEGIS requests extensive `Read`/`Write` permissions within the connected AWS environment to evaluate configurations and run remediation commands. **We strongly recommend running this against a Sandbox or Dev AWS Environment initially.**
+## Security Warning & IAM Permissions
+
+AEGIS requires `Read` permissions within the connected AWS environment to evaluate configurations and run remediation tests. **We strongly recommend running this against a Sandbox or Dev AWS Environment initially.**
+
+To successfully run AEGIS scans, the AWS Account credentials provided to the scanner must have an IAM policy with at least the following basic read permissions attached:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListAllMyBuckets",
+                "s3:GetBucketAcl",
+                "s3:GetBucketPolicy",
+                "s3:GetBucketPublicAccessBlock",
+                "ec2:DescribeInstances",
+                "ec2:DescribeSecurityGroups",
+                "iam:ListUsers",
+                "iam:ListPolicies"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
 
 ---
 <p align="center">Made with ❤️ for a more secure cloud.</p>
