@@ -156,7 +156,7 @@ const Landing = () => {
 
           <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={2}
             className="max-w-2xl mx-auto text-sm sm:text-lg lg:text-xl text-muted-foreground/80 leading-relaxed mb-6 sm:mb-8 font-light px-2 sm:px-0">
-            Autonomous S3 bucket scanning, AI&#8209;powered compliance reasoning, and
+            Autonomous S3, EC2, and IAM security scanning, AWS cost optimization, AI&#8209;powered compliance reasoning, and
             one&#8209;click remediation — all in a single platform.
           </motion.p>
 
@@ -270,11 +270,11 @@ const Landing = () => {
 
           <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-5">
             {[
-              { num: '01', icon: ScanSearch, title: 'Scan', desc: 'Auto-discover every bucket and its configuration in seconds.' },
-              { num: '02', icon: BrainCircuit, title: 'Analyze', desc: 'Nova 2 Lite reasons across compliance frameworks.' },
-              { num: '03', icon: BarChart3, title: 'Score', desc: 'Real-time risk scoring with severity breakdown.' },
-              { num: '04', icon: Eye, title: 'Approve', desc: 'Human-in-the-loop review before any change.' },
-              { num: '05', icon: Zap, title: 'Remediate', desc: 'Nova Act applies exact fixes automatically.' },
+              { num: '01', icon: ScanSearch, title: 'Scan', desc: 'Auto-discover S3, EC2, and IAM assets, security gaps, and idle resources.' },
+              { num: '02', icon: BrainCircuit, title: 'Analyze', desc: 'Nova 2 Lite reasons across compliance and cost frameworks.' },
+              { num: '03', icon: BarChart3, title: 'Score', desc: 'Real-time risk scoring and wasted cost calculations.' },
+              { num: '04', icon: Eye, title: 'Approve', desc: 'Human-in-the-loop review before any modifications.' },
+              { num: '05', icon: Zap, title: 'Remediate', desc: 'Nova applies security fixes, IAM policies, and resource cleanup.' },
             ].map((step, i) => (
               <motion.div
                 key={step.num}
@@ -317,12 +317,12 @@ const Landing = () => {
 
           <motion.div variants={stagger} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { icon: ScanSearch, title: 'Intelligent Scanning', desc: 'Deep inspection of ACLs, bucket policies, encryption, versioning, logging and public access blocks.' },
-              { icon: BrainCircuit, title: 'AI Reasoning', desc: 'Nova 2 Lite evaluates every finding against SOC 2, GDPR, HIPAA, and PCI-DSS simultaneously.' },
-              { icon: Zap, title: 'Auto Remediation', desc: 'Generate and apply least-privilege fixes with a single click — powered by Nova Act.' },
-              { icon: BarChart3, title: 'Risk Scoring', desc: 'Quantified 0-100 risk scores with per-finding severity and weighted impact analysis.' },
-              { icon: GitBranch, title: 'Multi-Agent Pipeline', desc: 'Five specialized agents collaborate: Scanner, Reasoner, Scorer, Planner, and Executor.' },
-              { icon: Lock, title: 'Approval Workflow', desc: 'Human-in-the-loop gating ensures no changes are applied without explicit approval.' },
+              { icon: ScanSearch, title: 'Intelligent Scanning', desc: 'Deep inspection of S3 buckets, EC2 instances, and IAM policies for security risks and compliance gaps.' },
+              { icon: DollarSign, title: 'Cost Optimization', desc: 'Auto-detect idle AWS resources, unattached volumes, and forgotten instances to eliminate wasted cloud costs.' },
+              { icon: BrainCircuit, title: 'AI Reasoning', desc: 'Nova evaluates findings against SOC 2, GDPR, HIPAA, and cost-efficiency best practices simultaneously.' },
+              { icon: Zap, title: 'Auto Remediation', desc: 'Generate and apply least-privilege IAM policies, EC2 security group fixes, and cost-saving actions.' },
+              { icon: BarChart3, title: 'Risk & Cost Scoring', desc: 'Quantified 0-100 risk scores alongside projected monthly savings and severity breakdown.' },
+              { icon: Lock, title: 'Approval Workflow', desc: 'Human-in-the-loop gating ensures no changes are applied without your explicit approval.' },
             ].map((f, i) => (
               <motion.div
                 key={i}
@@ -360,7 +360,7 @@ const Landing = () => {
                 <p className="text-lg text-muted-foreground leading-relaxed">
                   Traditional tools give you a PDF report. <span className="text-foreground font-medium">CloudGuard gives you the code.</span>
                   <br /><br />
-                  Our <span className="text-blue-400">Remediation Planner</span> generates precise, least-privilege IAM policies to replace over-permissive configurations. Review the diff, approve with one click, and sleep soundly.
+                  Our <span className="text-blue-400">Remediation Planner</span> generates precise, least-privilege IAM policies and EC2 security group rules to replace over-permissive configurations. Review the diff, approve with one click, and sleep soundly.
                 </p>
               </motion.div>
 
@@ -462,8 +462,8 @@ const Landing = () => {
 
           <motion.div variants={stagger} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {[
-              { icon: ScanSearch, name: 'Scanner Agent', desc: 'Fetches and normalizes bucket configs, policies, and metadata from AWS.' },
-              { icon: Cpu, name: 'Compliance Reasoner', desc: 'Nova 2 Lite analyzes violations across multiple compliance frameworks.' },
+              { icon: ScanSearch, name: 'Scanner Agent', desc: 'Fetches and normalizes infrastructure configs, policies, and utilization metrics from AWS.' },
+              { icon: Cpu, name: 'Intelligence Reasoner', desc: 'Nova 2 Lite analyzes security violations and identifies cost optimization opportunities.' },
               { icon: BarChart3, name: 'Risk Scorer', desc: 'Calculates weighted severity scores and prioritizes findings.' },
               { icon: BrainCircuit, name: 'Remediation Planner', desc: 'Generates minimal, safe IAM/S3 policy changes to fix issues.' },
               { icon: Zap, name: 'Execution Agent', desc: 'Nova Act applies approved fixes and verifies success.' },
