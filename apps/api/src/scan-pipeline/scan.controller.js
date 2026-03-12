@@ -36,6 +36,7 @@ exports.startScan = async (req, res) => {
                 TableName: TABLE_NAME,
                 Item: {
                     scan_id: scanId,
+                    user_email: req.user.email,
                     bucket: rawConfig.bucket, // Note: using bucket from rawConfig
                     status: score.severity === "CRITICAL" || score.severity === "HIGH" ? "AT_RISK" : "SECURE",
                     risk_score: score.score,
@@ -74,7 +75,11 @@ exports.startScan = async (req, res) => {
 
 exports.getScans = async (req, res) => {
     try {
-        const command = new ScanCommand({ TableName: TABLE_NAME });
+        const command = new ScanCommand({
+            TableName: TABLE_NAME,
+            FilterExpression: "user_email = :email",
+            ExpressionAttributeValues: { ":email": req.user.email }
+        });
         const response = await docClient.send(command);
 
         // Deduplicate: Group by bucket, keep only the LATEST scan
@@ -109,7 +114,7 @@ exports.getScanById = async (req, res) => {
         });
         const response = await docClient.send(command);
 
-        if (!response.Item) {
+        if (!response.Item || response.Item.user_email !== req.user.email) {
             return res.status(404).json({ error: "Scan not found" });
         }
 

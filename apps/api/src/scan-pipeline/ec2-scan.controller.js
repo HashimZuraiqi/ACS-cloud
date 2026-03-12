@@ -27,6 +27,7 @@ exports.startEC2Scan = async (req, res) => {
             const scanId = uuidv4();
             const item = {
                 scan_id: scanId,
+                user_email: req.user.email,
                 instance_id: instanceId,
                 status: score.severity === "CRITICAL" || score.severity === "HIGH" ? "AT_RISK" : "SECURE",
                 risk_score: score.score,
@@ -63,6 +64,7 @@ exports.startEC2Scan = async (req, res) => {
                 const scanId = uuidv4();
                 const item = {
                     scan_id: scanId,
+                    user_email: req.user.email,
                     instance_id: rawConfig.instance_id,
                     status: score.severity === "CRITICAL" || score.severity === "HIGH" ? "AT_RISK" : "SECURE",
                     risk_score: score.score,
@@ -92,7 +94,11 @@ exports.startEC2Scan = async (req, res) => {
 
 exports.getEC2Scans = async (req, res) => {
     try {
-        const command = new ScanCommand({ TableName: TABLE_NAME });
+        const command = new ScanCommand({
+            TableName: TABLE_NAME,
+            FilterExpression: "user_email = :email",
+            ExpressionAttributeValues: { ":email": req.user.email }
+        });
         const response = await docClient.send(command);
 
         const scans = response.Items || [];
@@ -124,7 +130,7 @@ exports.getEC2ScanById = async (req, res) => {
         });
         const response = await docClient.send(command);
 
-        if (!response.Item) {
+        if (!response.Item || response.Item.user_email !== req.user.email) {
             return res.status(404).json({ error: "EC2 scan not found" });
         }
 

@@ -25,6 +25,7 @@ exports.startIAMScan = async (req, res) => {
             const scanId = uuidv4();
             const item = {
                 scan_id: scanId,
+                user_email: req.user.email,
                 username: username,
                 status: analysis.compliance_status === "COMPLIANT" ? "SECURE" : "AT_RISK",
                 risk_score: analysis.score,
@@ -60,6 +61,7 @@ exports.startIAMScan = async (req, res) => {
                 const scanId = uuidv4();
                 const item = {
                     scan_id: scanId,
+                    user_email: req.user.email,
                     username: rawConfig.username,
                     status: analysis.compliance_status === "COMPLIANT" ? "SECURE" : "AT_RISK",
                     risk_score: analysis.score,
@@ -89,7 +91,11 @@ exports.startIAMScan = async (req, res) => {
 
 exports.getIAMScans = async (req, res) => {
     try {
-        const command = new ScanCommand({ TableName: TABLE_NAME });
+        const command = new ScanCommand({
+            TableName: TABLE_NAME,
+            FilterExpression: "user_email = :email",
+            ExpressionAttributeValues: { ":email": req.user.email }
+        });
         const response = await docClient.send(command);
 
         const scans = response.Items || [];
@@ -127,7 +133,7 @@ exports.getIAMScanById = async (req, res) => {
         });
         const response = await docClient.send(command);
 
-        if (!response.Item) {
+        if (!response.Item || response.Item.user_email !== req.user.email) {
             return res.status(404).json({ error: "IAM scan not found" });
         }
 

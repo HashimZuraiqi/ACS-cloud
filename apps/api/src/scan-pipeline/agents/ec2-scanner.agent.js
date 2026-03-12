@@ -18,6 +18,18 @@ class EC2ScannerAgent {
 
         console.log(`[EC2ScannerAgent] Scanning instance: ${instanceId}`);
 
+        let region = credentials.region;
+
+        // If no region is provided, try to discover the instance across all regions
+        if (!region) {
+            console.log(`[EC2ScannerAgent] No region provided, auto-discovering instance location...`);
+            region = await this._discoverInstanceRegion(instanceId, credentials);
+            if (!region) {
+                throw new Error(`Instance "${instanceId}" not found in any enabled AWS region. Please ensure the Instance ID is correct.`);
+            }
+            console.log(`[EC2ScannerAgent] Found instance in region: ${region}`);
+        }
+
         const clientConfig = {
             region: region,
             credentials: {
@@ -145,6 +157,51 @@ class EC2ScannerAgent {
             console.error(`[EC2ScannerAgent] Scan Pipeline Error: ${error.message}`);
             throw error;
         }
+    }
+
+    /**
+     * Discover which region an EC2 instance lives in by checking all enabled regions.
+     * Returns the region name or null if not found.
+     */
+    async _discoverInstanceRegion(instanceId, credentials) {
+        const baseClient = new EC2Client({
+            region: "us-east-1",
+            credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey
+            }
+        });
+
+        let regions = ["us-east-1"];
+        try {
+            const regionResp = await baseClient.send(new DescribeRegionsCommand({ AllRegions: false }));
+            if (regionResp.Regions && regionResp.Regions.length > 0) {
+                regions = regionResp.Regions.map(r => r.RegionName);
+            }
+        } catch (err) {
+            console.warn(`[EC2ScannerAgent] Region discovery failed: ${err.message}`);
+        }
+
+        for (const region of regions) {
+            try {
+                const regionalClient = new EC2Client({
+                    region,
+                    credentials: {
+                        accessKeyId: credentials.accessKeyId,
+                        secretAccessKey: credentials.secretAccessKey
+                    }
+                });
+                const resp = await regionalClient.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
+                const reservations = resp.Reservations || [];
+                if (reservations.length > 0 && reservations[0].Instances?.length > 0) {
+                    return region;
+                }
+            } catch (err) {
+                // Instance not in this region, continue
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -67,6 +67,7 @@ exports.approveFix = async (req, res) => {
             TableName: "CloudGuard_Scans",
             Item: {
                 scan_id: newScanId,
+                user_email: req.user.email,
                 bucket: bucketName,
                 status: newScore.severity === "CRITICAL" || newScore.severity === "HIGH" ? "AT_RISK" : "SECURE",
                 risk_score: newScore.score,
@@ -146,6 +147,7 @@ exports.approveEC2Fix = async (req, res) => {
             TableName: "CloudGuard_EC2_Scans",
             Item: {
                 scan_id: newScanId,
+                user_email: req.user.email,
                 instance_id: instanceId,
                 status: newScore.severity === "CRITICAL" || newScore.severity === "HIGH" ? "AT_RISK" : "SECURE",
                 risk_score: newScore.score,

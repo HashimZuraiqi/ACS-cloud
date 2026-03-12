@@ -122,6 +122,7 @@ exports.startCostScan = async (req, res) => {
         
         const item = {
             scan_id: scanId,
+            user_email: req.user.email,
             status: scanResults.length > 0 ? "WASTAGE_DETECTED" : "OPTIMIZED",
             resources: scanResults,
             total_wasted_cost: totalWasted.toFixed(2),
@@ -142,8 +143,11 @@ exports.startCostScan = async (req, res) => {
 
 exports.getCostScans = async (req, res) => {
     try {
-        // Here we just fetch all cost scans. Normally we'd filter by user account, but MVP design
-        const command = new ScanCommand({ TableName: TABLE_NAME });
+        const command = new ScanCommand({
+            TableName: TABLE_NAME,
+            FilterExpression: "user_email = :email",
+            ExpressionAttributeValues: { ":email": req.user.email }
+        });
         const response = await docClient.send(command);
 
         const scans = response.Items || [];
@@ -166,7 +170,7 @@ exports.getCostScanById = async (req, res) => {
         });
         const response = await docClient.send(command);
 
-        if (!response.Item) {
+        if (!response.Item || response.Item.user_email !== req.user.email) {
             return res.status(404).json({ error: "Cost scan not found" });
         }
 
