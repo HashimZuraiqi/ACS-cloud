@@ -1,4 +1,16 @@
-const { S3Client, GetBucketPolicyCommand, GetBucketAclCommand, GetBucketEncryptionCommand, GetPublicAccessBlockCommand, GetBucketLocationCommand, ListBucketsCommand } = require("@aws-sdk/client-s3");
+const {
+    S3Client,
+    GetBucketPolicyCommand,
+    GetBucketAclCommand,
+    GetBucketEncryptionCommand,
+    GetPublicAccessBlockCommand,
+    GetBucketLocationCommand,
+    ListBucketsCommand,
+    GetBucketVersioningCommand,
+    GetBucketLoggingCommand,
+    GetBucketLifecycleConfigurationCommand,
+    GetBucketCorsCommand,
+} = require("@aws-sdk/client-s3");
 
 class ScannerAgent {
     async scanBuckets(credentials, specificBucketName = null) {
@@ -64,6 +76,10 @@ class ScannerAgent {
                     policy: null,
                     acl: [],
                     encryption: "NOT_CONFIGURED",
+                    versioning: null,
+                    logging: null,
+                    lifecycle: null,
+                    cors: null,
                     region: region
                 };
 
@@ -111,6 +127,50 @@ class ScannerAgent {
                         console.warn(`[ScannerAgent] Error fetching Encryption for ${bucketName}: ${err.message}`);
                     }
                     config.encryption = "NOT_CONFIGURED";
+                }
+
+                // 5. Get Versioning Status
+                try {
+                    const command = new GetBucketVersioningCommand({ Bucket: bucketName });
+                    const response = await s3Client.send(command);
+                    config.versioning = { Status: response.Status || 'Disabled', MFADelete: response.MFADelete || 'Disabled' };
+                } catch (err) {
+                    console.warn(`[ScannerAgent] Error fetching Versioning for ${bucketName}: ${err.message}`);
+                    config.versioning = { Status: 'Disabled' };
+                }
+
+                // 6. Get Access Logging
+                try {
+                    const command = new GetBucketLoggingCommand({ Bucket: bucketName });
+                    const response = await s3Client.send(command);
+                    config.logging = response.LoggingEnabled ? { LoggingEnabled: true, TargetBucket: response.LoggingEnabled.TargetBucket, TargetPrefix: response.LoggingEnabled.TargetPrefix } : { LoggingEnabled: false };
+                } catch (err) {
+                    console.warn(`[ScannerAgent] Error fetching Logging for ${bucketName}: ${err.message}`);
+                    config.logging = { LoggingEnabled: false };
+                }
+
+                // 7. Get Lifecycle Configuration
+                try {
+                    const command = new GetBucketLifecycleConfigurationCommand({ Bucket: bucketName });
+                    const response = await s3Client.send(command);
+                    config.lifecycle = { Rules: (response.Rules || []).map(r => ({ ID: r.ID, Status: r.Status, Prefix: r.Prefix || r.Filter?.Prefix })) };
+                } catch (err) {
+                    if (err.name !== 'NoSuchLifecycleConfiguration') {
+                        console.warn(`[ScannerAgent] Error fetching Lifecycle for ${bucketName}: ${err.message}`);
+                    }
+                    config.lifecycle = { Rules: [] };
+                }
+
+                // 8. Get CORS Configuration
+                try {
+                    const command = new GetBucketCorsCommand({ Bucket: bucketName });
+                    const response = await s3Client.send(command);
+                    config.cors = (response.CORSRules || []).map(r => ({ AllowedOrigins: r.AllowedOrigins, AllowedMethods: r.AllowedMethods, AllowedHeaders: r.AllowedHeaders }));
+                } catch (err) {
+                    if (err.name !== 'NoSuchCORSConfiguration') {
+                        console.warn(`[ScannerAgent] Error fetching CORS for ${bucketName}: ${err.message}`);
+                    }
+                    config.cors = null;
                 }
 
                 runConfigs.push(config);

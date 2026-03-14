@@ -22,7 +22,11 @@ exports.startEC2Scan = async (req, res) => {
             // Scan a single instance
             const rawConfig = await ec2ScannerAgent.scanInstance(instanceId, credentials);
             const analysis = await ec2ComplianceReasoner.analyze(rawConfig, credentials);
-            const score = riskScorer.calculate(analysis);
+            const score = riskScorer.calculateWeighted(
+                analysis.findings || [],
+                rawConfig,
+                analysis
+            );
 
             const scanId = uuidv4();
             const item = {
@@ -37,7 +41,16 @@ exports.startEC2Scan = async (req, res) => {
                 explanation: analysis.reasoning,
                 remediation: analysis.remediation_suggestion,
                 raw_config: JSON.stringify(rawConfig),
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+
+                // ── Enhanced fields ──────────────────────────────────
+                evidence_chains: JSON.stringify(analysis.evidence_chains || []),
+                compliance_map: JSON.stringify(analysis.compliance_map || {}),
+                score_breakdown: JSON.stringify(score.factors || {}),
+                score_category: score.category || 'Configuration',
+                rule_summary: JSON.stringify(analysis.rule_summary || {}),
+                structured_findings: JSON.stringify(analysis.findings || []),
+                ai_verified: analysis.ai_available || false,
             };
 
             await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: item }));
@@ -59,7 +72,11 @@ exports.startEC2Scan = async (req, res) => {
                 }
 
                 const analysis = await ec2ComplianceReasoner.analyze(rawConfig, credentials);
-                const score = riskScorer.calculate(analysis);
+                const score = riskScorer.calculateWeighted(
+                    analysis.findings || [],
+                    rawConfig,
+                    analysis
+                );
 
                 const scanId = uuidv4();
                 const item = {
@@ -74,7 +91,16 @@ exports.startEC2Scan = async (req, res) => {
                     explanation: analysis.reasoning,
                     remediation: analysis.remediation_suggestion,
                     raw_config: JSON.stringify(rawConfig),
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+
+                    // ── Enhanced fields ──────────────────────────────
+                    evidence_chains: JSON.stringify(analysis.evidence_chains || []),
+                    compliance_map: JSON.stringify(analysis.compliance_map || {}),
+                    score_breakdown: JSON.stringify(score.factors || {}),
+                    score_category: score.category || 'Configuration',
+                    rule_summary: JSON.stringify(analysis.rule_summary || {}),
+                    structured_findings: JSON.stringify(analysis.findings || []),
+                    ai_verified: analysis.ai_available || false,
                 };
 
                 await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: item }));

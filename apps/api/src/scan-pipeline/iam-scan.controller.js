@@ -1,5 +1,7 @@
 const iamScannerAgent = require('./agents/iam-scanner.agent');
 const iamComplianceReasoner = require('./agents/iam-compliance-reasoner.agent');
+const privilegeEscalation = require('./agents/privilege-escalation');
+const riskScorer = require('./agents/risk-scorer.agent');
 const { docClient } = require('../config/db');
 const { PutCommand, ScanCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require('uuid');
@@ -22,6 +24,9 @@ exports.startIAMScan = async (req, res) => {
             const rawConfig = await iamScannerAgent.scanUser(username, credentials);
             const analysis = await iamComplianceReasoner.analyze(rawConfig);
 
+            // Check for privilege escalation paths
+            const escalationPaths = privilegeEscalation.detect([{ raw_config: rawConfig }]);
+
             const scanId = uuidv4();
             const item = {
                 scan_id: scanId,
@@ -35,12 +40,20 @@ exports.startIAMScan = async (req, res) => {
                 explanation: analysis.reasoning,
                 remediation: analysis.remediation_suggestion,
                 raw_config: JSON.stringify(rawConfig),
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+
+                // ── Enhanced fields ──────────────────────────────────
+                evidence_chains: JSON.stringify(analysis.evidence_chains || []),
+                compliance_map: JSON.stringify(analysis.compliance_map || {}),
+                rule_summary: JSON.stringify(analysis.rule_summary || {}),
+                structured_findings: JSON.stringify(analysis.findings || []),
+                escalation_paths: JSON.stringify(escalationPaths),
+                ai_verified: analysis.ai_available || false,
             };
 
             await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: item }));
 
-            results = { scan_id: scanId, result: { username, analysis } };
+            results = { scan_id: scanId, result: { username, analysis, escalation_paths: escalationPaths } };
         } else {
             // Scan all users
             const allConfigs = await iamScannerAgent.scanAllUsers(credentials);
@@ -48,6 +61,11 @@ exports.startIAMScan = async (req, res) => {
             if (allConfigs.length === 0) {
                 return res.status(200).json({ message: "No IAM users found.", results: [] });
             }
+
+            // Run privilege escalation detection across all users
+            const allEscalationPaths = privilegeEscalation.detect(
+                allConfigs.map(c => ({ raw_config: c }))
+            );
 
             const scanResults = [];
             for (const rawConfig of allConfigs) {
@@ -57,6 +75,11 @@ exports.startIAMScan = async (req, res) => {
                 }
 
                 const analysis = await iamComplianceReasoner.analyze(rawConfig);
+
+                // Get escalation paths for this specific user
+                const userEscalations = allEscalationPaths.filter(
+                    ep => ep.username === rawConfig.username
+                );
 
                 const scanId = uuidv4();
                 const item = {
@@ -71,11 +94,19 @@ exports.startIAMScan = async (req, res) => {
                     explanation: analysis.reasoning,
                     remediation: analysis.remediation_suggestion,
                     raw_config: JSON.stringify(rawConfig),
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+
+                    // ── Enhanced fields ──────────────────────────────
+                    evidence_chains: JSON.stringify(analysis.evidence_chains || []),
+                    compliance_map: JSON.stringify(analysis.compliance_map || {}),
+                    rule_summary: JSON.stringify(analysis.rule_summary || {}),
+                    structured_findings: JSON.stringify(analysis.findings || []),
+                    escalation_paths: JSON.stringify(userEscalations),
+                    ai_verified: analysis.ai_available || false,
                 };
 
                 await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: item }));
-                scanResults.push({ scan_id: scanId, result: { username: rawConfig.username, analysis } });
+                scanResults.push({ scan_id: scanId, result: { username: rawConfig.username, analysis, escalation_paths: userEscalations } });
             }
 
             results = { total_scanned: scanResults.length, results: scanResults };

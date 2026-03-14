@@ -3,7 +3,9 @@ const {
     DescribeInstancesCommand,
     DescribeSecurityGroupsCommand,
     DescribeVolumesCommand,
-    DescribeRegionsCommand
+    DescribeRegionsCommand,
+    DescribeFlowLogsCommand,
+    DescribeVpcsCommand,
 } = require("@aws-sdk/client-ec2");
 
 class EC2ScannerAgent {
@@ -88,6 +90,10 @@ class EC2ScannerAgent {
                 // EBS Encryption (will be enriched below)
                 ebs_volumes: [],
 
+                // VPC Flow Logs & Default VPC (enriched below)
+                vpc_flow_logs_enabled: false,
+                is_default_vpc: false,
+
                 // Tags for context
                 tags: instance.Tags || []
             };
@@ -148,6 +154,31 @@ class EC2ScannerAgent {
                     }));
                 } catch (err) {
                     console.warn(`[EC2ScannerAgent] Error fetching EBS Volumes: ${err.message}`);
+                }
+            }
+
+            // STEP 4: Check VPC Flow Logs
+            if (config.vpc_id) {
+                try {
+                    const flowCommand = new DescribeFlowLogsCommand({
+                        Filter: [{ Name: 'resource-id', Values: [config.vpc_id] }]
+                    });
+                    const flowResponse = await ec2Client.send(flowCommand);
+                    config.vpc_flow_logs_enabled = (flowResponse.FlowLogs || []).length > 0;
+                } catch (err) {
+                    console.warn(`[EC2ScannerAgent] Error fetching VPC Flow Logs: ${err.message}`);
+                }
+
+                // STEP 5: Check if Default VPC
+                try {
+                    const vpcCommand = new DescribeVpcsCommand({
+                        VpcIds: [config.vpc_id]
+                    });
+                    const vpcResponse = await ec2Client.send(vpcCommand);
+                    const vpc = (vpcResponse.Vpcs || [])[0];
+                    config.is_default_vpc = vpc?.IsDefault || false;
+                } catch (err) {
+                    console.warn(`[EC2ScannerAgent] Error checking Default VPC: ${err.message}`);
                 }
             }
 

@@ -1,72 +1,90 @@
-const riskScorer = require('./risk-scorer.agent');
+const iamRules = require('./rules/iam-rules');
+const evidenceChain = require('./evidence-chain');
+const { mapFindings } = require('./rules/compliance-frameworks');
 
 class IAMComplianceReasoner {
     /**
-     * Analyze an IAM user's configuration for "Least Privilege" compliance.
-     * Flag HIGH RISK if they have AdministratorAccess AND inactive for > 90 days.
+     * Analyze an IAM user's configuration using the enhanced pipeline:
+     * 1. Rule Engine → deterministic findings
+     * 2. Evidence Chain → audit trail
+     * 3. Compliance Mapping → per-framework results
+     * 
+     * NOTE: IAM reasoner stays deterministic (no Bedrock call) since
+     * IAM checks are primarily boolean/threshold-based and don't benefit
+     * as much from LLM contextual analysis.
      */
     async analyze(rawConfig) {
         console.log(`[IAMComplianceReasoner] Analyzing user: ${rawConfig.username}`);
 
+        // ── Stage 1: Deterministic Rule Engine ───────────────────────
+        const ruleResults = iamRules.evaluate(rawConfig);
+        console.log(`[IAMComplianceReasoner] Rule engine: ${ruleResults.failed} finding(s) out of ${ruleResults.total_rules} rules`);
+
+        // ── Stage 2: Evidence chains ────────────────────────────────
+        const evidenceChains = evidenceChain.build({
+            rawConfig,
+            ruleResults,
+            aiResult: null,
+            resourceType: 'IAM'
+        });
+
+        // ── Stage 3: Compliance mapping ─────────────────────────────
+        const complianceMap = mapFindings(ruleResults.findings);
+
+        // ── Build response ──────────────────────────────────────────
+        const failedFindings = ruleResults.findings.filter(f => !f.passed);
+
+        // Determine compliance status and severity
+        const worstSeverity = failedFindings.reduce((worst, f) => {
+            const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+            return (order[f.severity] || 0) > (order[worst] || 0) ? f.severity : worst;
+        }, 'LOW');
+        const severityScores = { CRITICAL: 95, HIGH: 75, MEDIUM: 50, LOW: 25 };
+
         const analysis = {
-            compliance_status: "COMPLIANT",
-            violations: [],
-            reasoning: "",
-            remediation_suggestion: ""
+            compliance_status: failedFindings.length > 0 ? "NON_COMPLIANT" : "COMPLIANT",
+            violations: failedFindings.map(f => f.description || f.title),
+            reasoning: this._buildReasoning(rawConfig, failedFindings),
+            remediation_suggestion: this._buildRemediation(failedFindings),
+            severity: failedFindings.length > 0 ? worstSeverity : 'LOW',
+            score: failedFindings.length > 0 ? severityScores[worstSeverity] || 50 : 10,
+
+            // ── Enhanced fields ──────────────────────────────────────
+            findings: ruleResults.findings,
+            evidence_chains: evidenceChains,
+            compliance_map: complianceMap,
+            rule_summary: {
+                total_rules: ruleResults.total_rules,
+                passed: ruleResults.passed,
+                failed: ruleResults.failed
+            },
+            ai_available: false,
+            rawConfig: rawConfig
         };
 
-        const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-        const now = new Date();
-
-        // Check inactivity
-        let lastActiveDate = null;
-        if (rawConfig.password_last_used && rawConfig.access_key_last_used) {
-            const pwdDate = new Date(rawConfig.password_last_used);
-            const keyDate = new Date(rawConfig.access_key_last_used);
-            lastActiveDate = pwdDate > keyDate ? pwdDate : keyDate;
-        } else if (rawConfig.password_last_used) {
-            lastActiveDate = new Date(rawConfig.password_last_used);
-        } else if (rawConfig.access_key_last_used) {
-            lastActiveDate = new Date(rawConfig.access_key_last_used);
-        }
-
-        let inactiveDays = null;
-        if (lastActiveDate) {
-            inactiveDays = Math.floor((now - lastActiveDate) / (1000 * 60 * 60 * 24));
-        } else {
-            // If no activity is recorded, assume they've never been active or very inactive.
-            // We'll treat this as 999 days for math purposes.
-            inactiveDays = 999;
-        }
-
-        // Apply rules
-        const isAdmin = rawConfig.has_admin_access;
-
-        if (isAdmin && inactiveDays > 90) {
-            analysis.compliance_status = "NON_COMPLIANT";
-            analysis.violations.push("Admin access heavily unused (Inactive > 90 days)");
-            analysis.reasoning = `The user ${rawConfig.username} has AdministratorAccess but hasn't been active in ${inactiveDays === 999 ? 'ever/unrecorded' : inactiveDays + ' days'}. This violates the principle of least privilege and increases blast radius if credentials are leaked.`;
-            analysis.remediation_suggestion = "Remove AdministratorAccess policy. Issue specific, bounded permissions if access is still required. Deactivate unused access keys.";
-
-            // Directly format this to score a CRITICAL severity.
-            analysis.severity = "CRITICAL";
-            analysis.score = 95;
-        } else if (isAdmin) {
-            analysis.compliance_status = "COMPLIANT";
-            analysis.reasoning = `The user ${rawConfig.username} has AdministratorAccess but has been active within the last 90 days (${inactiveDays} days ago). Monitor usage to ensure full admin permissions are genuinely required.`;
-
-            // Even if active, having admin access might be medium risk, but it's compliant against the 90 day rule
-            analysis.severity = "MEDIUM";
-            analysis.score = 50;
-        } else {
-            analysis.compliance_status = "COMPLIANT";
-            analysis.reasoning = `The user ${rawConfig.username} does not have standing AdministratorAccess and follows basic least privilege boundaries.`;
-
-            analysis.severity = "LOW";
-            analysis.score = 10;
-        }
-
         return analysis;
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────
+
+    _buildReasoning(rawConfig, findings) {
+        if (findings.length === 0) {
+            return `User ${rawConfig.username} follows basic least-privilege boundaries. All IAM security checks passed.`;
+        }
+
+        const criticals = findings.filter(f => f.severity === 'CRITICAL');
+        const highs = findings.filter(f => f.severity === 'HIGH');
+
+        let reasoning = `User ${rawConfig.username}: found ${findings.length} security issue(s). `;
+        if (criticals.length > 0) reasoning += `${criticals.length} CRITICAL (${criticals.map(f => f.rule_id).join(', ')}). `;
+        if (highs.length > 0) reasoning += `${highs.length} HIGH (${highs.map(f => f.rule_id).join(', ')}). `;
+
+        return reasoning.trim();
+    }
+
+    _buildRemediation(findings) {
+        if (findings.length === 0) return 'No immediate action required.';
+        return findings.map(f => `[${f.rule_id}] ${f.remediation}`).join(' | ');
     }
 }
 

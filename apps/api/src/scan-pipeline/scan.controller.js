@@ -24,13 +24,17 @@ exports.startScan = async (req, res) => {
         const scanResults = [];
 
         for (const rawConfig of rawConfigs) {
-            // 2. Reason (Dev A)
+            // 2. Analyze with enhanced pipeline (Rule Engine → AI → Evidence Chain)
             const analysis = await complianceReasoner.analyze(rawConfig, credentials);
 
-            // 3. Score (Dev A)
-            const score = riskScorer.calculate(analysis);
+            // 3. Weighted multi-factor risk score
+            const score = riskScorer.calculateWeighted(
+                analysis.findings || [],
+                rawConfig,
+                analysis
+            );
 
-            // 4. Save to DB
+            // 4. Save to DB (with enhanced fields)
             const scanId = uuidv4();
             const command = new PutCommand({
                 TableName: TABLE_NAME,
@@ -46,7 +50,16 @@ exports.startScan = async (req, res) => {
                     explanation: analysis.reasoning,
                     remediation: analysis.remediation_suggestion,
                     raw_config: JSON.stringify(rawConfig),
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+
+                    // ── Enhanced fields from new engine ──────────────
+                    evidence_chains: JSON.stringify(analysis.evidence_chains || []),
+                    compliance_map: JSON.stringify(analysis.compliance_map || {}),
+                    score_breakdown: JSON.stringify(score.factors || {}),
+                    score_category: score.category || 'Configuration',
+                    rule_summary: JSON.stringify(analysis.rule_summary || {}),
+                    structured_findings: JSON.stringify(analysis.findings || []),
+                    ai_verified: analysis.ai_available || false,
                 }
             });
 

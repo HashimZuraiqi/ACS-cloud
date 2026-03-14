@@ -5,6 +5,7 @@ const {
     ListUserPoliciesCommand,
     GetAccessKeyLastUsedCommand,
     ListAccessKeysCommand,
+    ListMFADevicesCommand,
 } = require("@aws-sdk/client-iam");
 
 class IAMScannerAgent {
@@ -38,6 +39,9 @@ class IAMScannerAgent {
                 access_key_last_used: null,
                 attached_policies: [],
                 inline_policies: [],
+                mfa_enabled: false,
+                access_key_age_days: null,
+                access_keys: [],
             };
 
             // 1. Get Attached Policies
@@ -98,8 +102,28 @@ class IAMScannerAgent {
                     }
                 }
                 config.access_key_last_used = mostRecentKeyUsage ? mostRecentKeyUsage.toISOString() : null;
+
+                // Store access key metadata for IAM-005 rule check
+                config.access_keys = keysResponse.AccessKeyMetadata || [];
+
+                // Calculate access key age
+                const oldestKey = (keysResponse.AccessKeyMetadata || [])
+                    .filter(k => k.Status === 'Active')
+                    .sort((a, b) => new Date(a.CreateDate) - new Date(b.CreateDate))[0];
+                if (oldestKey && oldestKey.CreateDate) {
+                    config.access_key_age_days = Math.floor((Date.now() - new Date(oldestKey.CreateDate).getTime()) / (1000 * 60 * 60 * 24));
+                }
             } catch (err) {
                 console.warn(`[IAMScannerAgent] Error fetching access keys for ${username}: ${err.message}`);
+            }
+
+            // 5. Check MFA Devices
+            try {
+                const mfaCommand = new ListMFADevicesCommand({ UserName: username });
+                const mfaResponse = await iamClient.send(mfaCommand);
+                config.mfa_enabled = (mfaResponse.MFADevices || []).length > 0;
+            } catch (err) {
+                console.warn(`[IAMScannerAgent] Error fetching MFA devices for ${username}: ${err.message}`);
             }
 
             return config;
