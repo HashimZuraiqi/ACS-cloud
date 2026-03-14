@@ -139,8 +139,8 @@ export const api = {
     },
 
     // Reports
-    downloadResourceReport: async (scanId, service = 's3') => {
-        const response = await client.get(`/reports/download-resource?scanId=${scanId}&service=${service}`, {
+    downloadResourceReport: async (scanId, type = 's3') => {
+        const response = await client.get(`/reports/download-resource?scanId=${scanId}&type=${type}`, {
             responseType: 'blob'
         });
         return response.data;
