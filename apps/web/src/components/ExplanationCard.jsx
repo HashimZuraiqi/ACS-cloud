@@ -1,8 +1,9 @@
-﻿import React from 'react';
+import React from 'react';
 import { Brain, TrendingUp, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 const ExplanationCard = ({ analysis, className }) => {
   const { explanation, confidence, evidence } = analysis;
+  const score = typeof confidence === 'number' ? confidence : null;
   return (
     <div className={cn('bg-card/40 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden', className)}>
       <div className="p-6">
@@ -13,10 +14,12 @@ const ExplanationCard = ({ analysis, className }) => {
             </div>
             <h3 className="text-lg font-bold text-foreground">AI Risk Analysis</h3>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20">
-            <TrendingUp className="w-4 h-4 text-blue-400" />
-            <span className="text-sm font-medium text-blue-300">{confidence}% Confidence</span>
-          </div>
+          {score !== null && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20 cursor-help" title="Confidence in the analysis based on rules detected, verified findings, and AI verification.">
+              <TrendingUp className="w-4 h-4 text-blue-400" />
+              <span className="text-sm font-medium text-blue-300">Confidence: {score}%</span>
+            </div>
+          )}
         </div>
 
         <div className="mb-6">
@@ -41,23 +44,25 @@ const ExplanationCard = ({ analysis, className }) => {
         )}
       </div>
 
-      {/* Confidence Bar */}
-      <div className="px-6 pb-6">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs font-medium text-muted-foreground">Confidence Score</span>
-          <span className="text-xs font-bold text-foreground">{confidence}%</span>
+      {/* Confidence Bar — only shown when score is available */}
+      {score !== null && (
+        <div className="px-6 pb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-medium text-muted-foreground cursor-help" title="Calculated from: 40 base + (rules detected × 10) + (verified findings × 5) + AI bonus. Max 95%.">Confidence Score</span>
+            <span className="text-xs font-bold text-foreground">{score}%</span>
+          </div>
+          <div className="relative w-full h-2 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className={cn('h-full bg-gradient-to-r transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]',
+                score >= 90 ? 'from-emerald-500 to-green-400' :
+                  score >= 70 ? 'from-blue-500 to-cyan-400' :
+                    'from-amber-500 to-orange-400'
+              )}
+              style={{ width: score + '%' }}
+            />
+          </div>
         </div>
-        <div className="relative w-full h-2 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className={cn('h-full bg-gradient-to-r transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]',
-              confidence >= 90 ? 'from-emerald-500 to-green-400' :
-                confidence >= 70 ? 'from-blue-500 to-cyan-400' :
-                  'from-amber-500 to-orange-400'
-            )}
-            style={{ width: confidence + '%' }}
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
 };

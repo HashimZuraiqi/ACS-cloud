@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { AlertTriangle, CheckCircle, XCircle, Loader2, Shield, Server, ExternalLink, ArrowRight, Info } from 'lucide-react';
@@ -193,12 +193,15 @@ const ApprovalModal = ({ open, onOpenChange, scanId, resourceName, actionCount, 
                     <div key={idx} className={cn(
                       "flex items-start gap-3 text-sm p-3 rounded-lg border",
                       detail.status === 'SUCCESS' ? 'bg-emerald-500/5 border-emerald-500/10' :
-                        detail.status === 'RECOMMENDATION' ? 'bg-amber-500/5 border-amber-500/10' :
-                          detail.status === 'WARNING' ? 'bg-amber-500/5 border-amber-500/10' :
-                            'bg-red-500/5 border-red-500/10'
+                        detail.status === 'ALREADY_COMPLIANT' ? 'bg-blue-500/5 border-blue-500/10' :
+                          detail.status === 'RECOMMENDATION' ? 'bg-amber-500/5 border-amber-500/10' :
+                            detail.status === 'WARNING' ? 'bg-amber-500/5 border-amber-500/10' :
+                              'bg-red-500/5 border-red-500/10'
                     )}>
                       {detail.status === 'SUCCESS' ? (
                         <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      ) : detail.status === 'ALREADY_COMPLIANT' ? (
+                        <CheckCircle className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
                       ) : detail.status === 'RECOMMENDATION' || detail.status === 'WARNING' ? (
                         <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                       ) : (
@@ -211,13 +214,42 @@ const ApprovalModal = ({ open, onOpenChange, scanId, resourceName, actionCount, 
                       <span className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex-shrink-0",
                         detail.status === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400' :
-                          detail.status === 'RECOMMENDATION' || detail.status === 'WARNING' ? 'bg-amber-500/10 text-amber-400' :
-                            'bg-red-500/10 text-red-400'
+                          detail.status === 'ALREADY_COMPLIANT' ? 'bg-blue-500/10 text-blue-400' :
+                            detail.status === 'RECOMMENDATION' || detail.status === 'WARNING' ? 'bg-amber-500/10 text-amber-400' :
+                              'bg-red-500/10 text-red-400'
                       )}>
-                        {detail.status}
+                        {detail.status === 'ALREADY_COMPLIANT' ? 'SKIPPED' : detail.status}
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Fix #6: Configuration Diff Section */}
+              {result.details && result.details.some(d => d.before || d.after) && (
+                <div className="bg-white/5 rounded-xl border border-white/10 p-4">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Configuration Changes</h4>
+                  <div className="space-y-3">
+                    {result.details.filter(d => d.before || d.after).map((detail, idx) => (
+                      <div key={idx} className="bg-white/5 rounded-lg border border-white/5 p-3">
+                        <p className="font-semibold text-foreground text-sm mb-2">{detail.action.replace(/_/g, ' ')}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Before</p>
+                            <pre className="text-xs text-muted-foreground bg-red-500/5 rounded p-2 border border-red-500/10 overflow-auto max-h-24 whitespace-pre-wrap">
+                              {typeof detail.before === 'object' ? JSON.stringify(detail.before, null, 2) : String(detail.before || '—')}
+                            </pre>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">After</p>
+                            <pre className="text-xs text-muted-foreground bg-emerald-500/5 rounded p-2 border border-emerald-500/10 overflow-auto max-h-24 whitespace-pre-wrap">
+                              {typeof detail.after === 'object' ? JSON.stringify(detail.after, null, 2) : String(detail.after || '—')}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

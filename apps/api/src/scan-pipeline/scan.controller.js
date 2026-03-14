@@ -34,14 +34,24 @@ exports.startScan = async (req, res) => {
                 analysis
             );
 
-            // 4. Save to DB (with enhanced fields)
+            // 4. Calculate confidence score (Fix: was showing "%" without a number)
+            const findings = analysis.findings || [];
+            const rulesDetected = findings.length;
+            const verifiedFindings = findings.filter(f => f.passed !== undefined).length;
+            const aiBonus = analysis.ai_available ? 10 : 0;
+            const confidence_score = Math.min(
+                40 + (rulesDetected * 10) + (verifiedFindings * 5) + aiBonus,
+                95
+            );
+
+            // 5. Save to DB (with enhanced fields)
             const scanId = uuidv4();
             const command = new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
                     scan_id: scanId,
                     user_email: req.user.email,
-                    bucket: rawConfig.bucket, // Note: using bucket from rawConfig
+                    bucket: rawConfig.bucket,
                     status: score.severity === "CRITICAL" || score.severity === "HIGH" ? "AT_RISK" : "SECURE",
                     risk_score: score.score,
                     severity: score.severity,
@@ -51,6 +61,7 @@ exports.startScan = async (req, res) => {
                     remediation: analysis.remediation_suggestion,
                     raw_config: JSON.stringify(rawConfig),
                     created_at: new Date().toISOString(),
+                    confidence_score,
 
                     // ── Enhanced fields from new engine ──────────────
                     evidence_chains: JSON.stringify(analysis.evidence_chains || []),

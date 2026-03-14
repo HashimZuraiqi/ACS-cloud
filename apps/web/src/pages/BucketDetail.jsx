@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, ShieldAlert, FileJson, BrainCircuit, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, ShieldAlert, FileJson, BrainCircuit, CheckCircle2, AlertTriangle, Download, Lock, Globe, FileText, Settings } from 'lucide-react';
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button.jsx';
 import { useToast } from '@/components/ui/use-toast';
@@ -11,7 +11,7 @@ import ExplanationCard from '@/components/ExplanationCard.jsx';
 import RemediationPlan from '@/components/RemediationPlan.jsx';
 import ApprovalModal from '@/components/ApprovalModal.jsx';
 import { useAuth } from '@/contexts/AuthContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -26,6 +26,22 @@ const fadeUp = {
   })
 };
 
+// Fix #8: Finding icons
+const findingIcons = {
+  encryption: <Lock className="w-3.5 h-3.5 text-amber-400" />,
+  public: <Globe className="w-3.5 h-3.5 text-red-400" />,
+  compliance: <FileText className="w-3.5 h-3.5 text-blue-400" />,
+  remediation: <Settings className="w-3.5 h-3.5 text-emerald-400" />,
+};
+
+const getFindingIcon = (text) => {
+  const t = (text || '').toLowerCase();
+  if (t.includes('encrypt')) return findingIcons.encryption;
+  if (t.includes('public') || t.includes('acl') || t.includes('access')) return findingIcons.public;
+  if (t.includes('compliance') || t.includes('soc') || t.includes('policy')) return findingIcons.compliance;
+  return findingIcons.remediation;
+};
+
 const BucketDetail = () => {
   const { scanId } = useParams();
   const navigate = useNavigate();
@@ -35,23 +51,26 @@ const BucketDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [prevScore, setPrevScore] = useState(null);
 
   const fetchScan = async () => {
     try {
       setLoading(true);
       const data = await api.getScanResult(scanId);
 
-      // Map Backend DB format to UI format
       const mapped = {
         scanId: data.scan_id,
         bucketName: data.bucket,
         riskScore: data.risk_score,
+        confidenceScore: data.confidence_score || null,
         status: data.status === 'SECURE' ? 'compliant' : 'warning',
         timestamp: data.created_at,
         configuration: JSON.parse(data.raw_config || '{}'),
         aiAnalysis: {
           explanation: data.explanation,
-          reasoning: data.explanation // or data.findings joined
+          confidence: data.confidence_score || null,
+          reasoning: data.explanation
         },
         complianceViolations: (data.findings || []).map(f => ({
           standard: "SOC 2",
@@ -78,11 +97,34 @@ const BucketDetail = () => {
   useEffect(() => { if (scanId) { fetchScan(); } }, [scanId]);
 
   const handleRemediationDone = (result) => {
+    // Save old score for animation
+    if (scanResult) setPrevScore(scanResult.riskScore);
     toast({ title: "Remediation Applied", description: result.message, variant: "success" });
     if (result.newScanId) {
       navigate(`/bucket/${result.newScanId}`);
     } else {
       fetchScan();
+    }
+  };
+
+  // Fix #4: Download PDF report
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloading(true);
+      const blob = await api.downloadResourceReport(scanId, 's3');
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cloudguard-security-report-${scanResult?.bucketName || 'report'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Report Downloaded", description: "Security report saved as PDF", variant: "success" });
+    } catch (err) {
+      toast({ title: "Download Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -107,9 +149,19 @@ const BucketDetail = () => {
 
   return (
     <div className="space-y-8 pb-12">
-      <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
+      <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-muted-foreground hover:text-foreground pl-0 hover:bg-transparent -ml-2 mb-2 group">
           <ArrowLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />Back to Dashboard
+        </Button>
+        {/* Fix #4: Download button */}
+        <Button
+          onClick={handleDownloadPDF}
+          disabled={downloading}
+          variant="outline"
+          className="gap-2 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+        >
+          <Download className="w-4 h-4" />
+          {downloading ? 'Generating...' : 'Download Security Report'}
         </Button>
       </motion.div>
 
@@ -134,8 +186,19 @@ const BucketDetail = () => {
             </div>
           </div>
           <div className="w-full md:w-72 bg-white/5 rounded-xl p-4 border border-white/10">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Security Score</h3>
-            <RiskScoreBar score={scanResult.riskScore} />
+            {/* Fix #8: Tooltip for risk score */}
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 cursor-help" title="Risk score from 0 (safe) to 100 (critical). Based on weighted severity of detected vulnerabilities.">Security Score</h3>
+            {/* Fix #8: Animated score */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={scanResult.riskScore}
+                initial={prevScore !== null ? { scale: 1.2, color: '#22c55e' } : false}
+                animate={{ scale: 1, color: undefined }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+              >
+                <RiskScoreBar score={scanResult.riskScore} />
+              </motion.div>
+            </AnimatePresence>
             <div className="mt-2 text-right text-xs text-muted-foreground">
               {scanResult.riskScore >= 70 ? 'High Risk' : scanResult.riskScore >= 40 ? 'Medium Risk' : 'Low Risk'}
             </div>
@@ -163,12 +226,15 @@ const BucketDetail = () => {
 
           {scanResult.complianceViolations?.length > 0 && (
             <div className="bg-red-500/5 backdrop-blur-sm border border-red-500/20 rounded-xl p-5">
-              <h3 className="text-sm font-bold text-red-500 mb-4 uppercase tracking-wide flex items-center gap-2">
+              {/* Fix #8: Tooltip for compliance */}
+              <h3 className="text-sm font-bold text-red-500 mb-4 uppercase tracking-wide flex items-center gap-2 cursor-help" title="Compliance violations detected against industry standards (SOC2, CIS, NIST, etc.)">
                 <AlertTriangle className="w-4 h-4" /> Compliance Violations
               </h3>
               <ul className="space-y-3">
                 {scanResult.complianceViolations.map((violation, idx) => (
                   <li key={idx} className="flex gap-3 text-sm bg-red-500/5 p-3 rounded-lg border border-red-500/10">
+                    {/* Fix #8: Icons for findings */}
+                    <span className="mt-0.5">{getFindingIcon(violation.requirement)}</span>
                     <span className="font-bold text-red-400 min-w-[80px]">{violation.standard}:</span>
                     <span className="text-foreground/90">{violation.requirement}</span>
                   </li>

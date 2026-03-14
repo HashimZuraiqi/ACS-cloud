@@ -131,5 +131,20 @@ export const api = {
     getCostScanResult: async (scanId) => {
         const response = await client.get(`/cost-scan/${scanId}`);
         return response.data;
+    },
+
+    // Reports
+    downloadResourceReport: async (scanId, service = 's3') => {
+        const response = await client.get(`/reports/download-resource?scanId=${scanId}&service=${service}`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
+
+    downloadFullReport: async () => {
+        const response = await client.get('/reports/download', {
+            responseType: 'blob'
+        });
+        return response.data;
     }
 };

@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Activity, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Activity, RefreshCw, AlertCircle, Lock, Globe, Settings, FileText } from 'lucide-react';
 import { api } from '@/services/api';
 import ActivityTimeline from '@/components/ActivityTimeline.jsx';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,25 @@ import { motion } from 'framer-motion';
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+};
+
+// Fix #10: Map remediation actions to descriptive bullet points
+const getActionBullets = (findings, status) => {
+  const bullets = [];
+  if (!findings || !Array.isArray(findings)) return bullets;
+
+  for (const f of findings) {
+    const text = (f || '').toLowerCase();
+    if (text.includes('public access') || text.includes('block public')) bullets.push('🌐 Enabled Public Access Block');
+    if (text.includes('acl') || text.includes('alluser')) bullets.push('🔒 Set ACL to Private');
+    if (text.includes('policy') || text.includes('wildcard') || text.includes('principal')) bullets.push('📋 Sanitized Bucket Policy');
+    if (text.includes('encrypt')) bullets.push('🔐 Enabled Encryption');
+    if (text.includes('version')) bullets.push('📦 Enabled Versioning');
+    if (text.includes('log')) bullets.push('📝 Enabled Access Logging');
+  }
+
+  // Deduplicate
+  return [...new Set(bullets)];
 };
 
 const ActivityLog = () => {
@@ -22,16 +41,33 @@ const ActivityLog = () => {
         setLoading(true);
         const data = await api.getScans();
 
-        // Transform API data to match ActivityTimeline props
-        const formattedData = data.map(scan => ({
-          id: scan.scan_id,
-          action: scan.status === 'SECURE' ? 'Remediation Executed' : 'Security Scan Completed',
-          bucketName: scan.bucket,
-          details: scan.status === 'SECURE' ? `Successfully blocked public access for ${scan.bucket}` : `Detected risk level: ${scan.risk_score ? scan.risk_score : 'Unknown'}`,
-          status: scan.status === 'SECURE' ? 'success' : 'warning', // Timeline expects success/failed/warning
-          timestamp: scan.created_at,
-          user: currentUser?.email || 'System'
-        })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        // Fix #10: Expanded activity log entries
+        const formattedData = data.map(scan => {
+          const isSecure = scan.status === 'SECURE';
+          const actionBullets = getActionBullets(scan.findings, scan.status);
+
+          let details;
+          if (isSecure && actionBullets.length > 0) {
+            details = `Successfully remediated ${scan.bucket}:\n${actionBullets.map(b => `  • ${b}`).join('\n')}`;
+          } else if (isSecure) {
+            details = `Successfully secured ${scan.bucket}. Risk score: ${scan.risk_score || 0}/100`;
+          } else {
+            const findingCount = (scan.findings || []).length;
+            details = `Detected ${findingCount} finding(s) on ${scan.bucket}. Risk score: ${scan.risk_score || 'Unknown'}/100`;
+          }
+
+          return {
+            id: scan.scan_id,
+            action: isSecure ? 'Remediation Executed' : 'Security Scan Completed',
+            bucketName: scan.bucket,
+            details,
+            status: isSecure ? 'success' : 'warning',
+            timestamp: scan.created_at,
+            user: currentUser?.email || 'System',
+            riskScore: scan.risk_score,
+            severity: scan.severity
+          };
+        }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
         setActivities(formattedData);
       } catch (err) {
