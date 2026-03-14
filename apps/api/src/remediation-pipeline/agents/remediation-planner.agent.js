@@ -1,145 +1,247 @@
+const decisionEngine = require('./remediation-decision-engine');
+const impactAnalyzer = require('./impact-analyzer');
+
 class RemediationPlannerAgent {
 
     /**
-     * Generate an S3 remediation plan based on scan findings.
+     * Generate an S3 remediation plan with smart decision classification.
+     * Each step includes: action, decision, impact, reasoning, and reversibility.
      */
     createPlan(scanResult) {
         console.log(`[RemediationPlanner] Generating S3 plan for: ${scanResult.bucket}`);
 
+        const rawConfig = this._parseRawConfig(scanResult.raw_config);
         const steps = [];
         const findings = scanResult.findings || [];
+        const structuredFindings = this._getStructuredFindings(scanResult);
         const findingsStr = JSON.stringify(findings).toLowerCase();
 
-        if (findingsStr.includes("public access") || findingsStr.includes("public acl") || findingsStr.includes("alluser")) {
-            steps.push({ action: "PUT_PUBLIC_ACCESS_BLOCK", description: "Enable Block Public Access", risk_of_change: "Low" });
+        // Map findings to remediation actions
+        const actionMappings = [
+            {
+                check: () => findingsStr.includes("public access") || findingsStr.includes("public acl") || findingsStr.includes("alluser")
+                    || structuredFindings.some(f => f.rule_id === 'S3-001'),
+                action: "PUT_PUBLIC_ACCESS_BLOCK",
+                description: "Enable Block Public Access",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-001')
+            },
+            {
+                check: () => findingsStr.includes("acl") || findingsStr.includes("alluser") || findingsStr.includes("authenticateduser")
+                    || structuredFindings.some(f => ['S3-002', 'S3-003'].includes(f.rule_id)),
+                action: "REMOVE_PUBLIC_ACLS",
+                description: "Set bucket ACL to private",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-002' || f.rule_id === 'S3-003')
+            },
+            {
+                check: () => findingsStr.includes("policy") || findingsStr.includes("principal") || findingsStr.includes("wildcard")
+                    || structuredFindings.some(f => f.rule_id === 'S3-004'),
+                action: "SANITIZE_BUCKET_POLICY",
+                description: "Remove wildcard principal Allow statements",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-004')
+            },
+            {
+                check: () => findingsStr.includes("encrypt") || findingsStr.includes("not_configured") || findingsStr.includes("sse")
+                    || structuredFindings.some(f => f.rule_id === 'S3-006'),
+                action: "ENABLE_ENCRYPTION",
+                description: "Enable SSE-S3 (AES256) encryption",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-006')
+            },
+            {
+                check: () => structuredFindings.some(f => f.rule_id === 'S3-008'),
+                action: "ENABLE_VERSIONING",
+                description: "Enable bucket versioning",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-008')
+            },
+            {
+                check: () => structuredFindings.some(f => f.rule_id === 'S3-009'),
+                action: "ENABLE_LOGGING",
+                description: "Enable S3 access logging",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-009')
+            },
+        ];
+
+        for (const mapping of actionMappings) {
+            if (!mapping.check()) continue;
+
+            const finding = mapping.matchingRule || {
+                rule_id: 'LEGACY',
+                title: mapping.description,
+                severity: 'MEDIUM',
+                confidence: 0.8
+            };
+
+            const decision = decisionEngine.classify({
+                finding,
+                rawConfig,
+                action: mapping.action,
+                resourceType: 'S3'
+            });
+
+            steps.push({
+                action: mapping.action,
+                description: mapping.description,
+                decision: decision.decision,
+                reasoning: decision.reasoning,
+                confidence: decision.confidence,
+                risk_of_change: decision.risk_of_change,
+                reversible: decision.reversible,
+                rule_id: finding.rule_id,
+                severity: finding.severity,
+                ui_display: decision.ui_display
+            });
         }
 
-        if (findingsStr.includes("acl") || findingsStr.includes("alluser") || findingsStr.includes("authenticateduser")) {
-            steps.push({ action: "REMOVE_PUBLIC_ACLS", description: "Set bucket ACL to private", risk_of_change: "Low" });
-        }
+        const plan = {
+            plan_id: `plan_s3_${Date.now()}`,
+            service: "s3",
+            resource: scanResult.bucket,
+            status: "PENDING_APPROVAL",
+            steps,
+            summary: {
+                total_steps: steps.length,
+                auto_fix: steps.filter(s => s.decision === 'AUTO_FIX').length,
+                suggest_fix: steps.filter(s => s.decision === 'SUGGEST_FIX').length,
+                intentional_skip: steps.filter(s => s.decision === 'INTENTIONAL_SKIP').length,
+            }
+        };
 
-        if (findingsStr.includes("policy") || findingsStr.includes("principal") || findingsStr.includes("wildcard")) {
-            steps.push({ action: "SANITIZE_BUCKET_POLICY", description: "Remove wildcard principal Allow statements", risk_of_change: "Medium" });
-        }
+        // Add impact analysis
+        const impactReport = impactAnalyzer.analyze(plan, rawConfig, 'S3');
+        plan.impact = impactReport;
 
-        if (findingsStr.includes("encrypt") || findingsStr.includes("not_configured") || findingsStr.includes("sse")) {
-            steps.push({ action: "ENABLE_ENCRYPTION", description: "Enable SSE-S3 (AES256) encryption", risk_of_change: "None" });
-        }
-
-        steps.push({ action: "ENABLE_VERSIONING", description: "Enable bucket versioning", risk_of_change: "None" });
-        steps.push({ action: "ENABLE_LOGGING", description: "Enable S3 access logging", risk_of_change: "None" });
-
-        return { plan_id: `plan_s3_${Date.now()}`, service: "s3", resource: scanResult.bucket, status: "PENDING_APPROVAL", steps };
+        return plan;
     }
 
     /**
-     * Generate an EC2 remediation plan.
-     * Uses BOTH the findings strings AND the raw_config to determine what needs fixing.
+     * Generate an EC2 remediation plan with smart decision classification.
      */
     createEC2Plan(scanResult) {
         const instanceId = scanResult.instance_id;
         console.log(`[RemediationPlanner] Generating EC2 plan for: ${instanceId}`);
 
+        const rawConfig = this._parseRawConfig(scanResult.raw_config);
         const steps = [];
         const findings = scanResult.findings || [];
+        const structuredFindings = this._getStructuredFindings(scanResult);
         const findingsStr = JSON.stringify(findings).toLowerCase();
 
-        // Parse raw_config to check actual state (more reliable than string matching)
-        let rawConfig = {};
-        try {
-            rawConfig = typeof scanResult.raw_config === 'string'
-                ? JSON.parse(scanResult.raw_config)
-                : (scanResult.raw_config || {});
-        } catch (e) {
-            console.warn(`[RemediationPlanner] Could not parse raw_config: ${e.message}`);
-        }
-
-        // 1. Check for SSH open to world — inspect raw security group rules directly
-        const hasOpenSSH = this._hasOpenPort(rawConfig, 22);
-        if (hasOpenSSH || findingsStr.includes("ssh") || findingsStr.includes("port 22") || findingsStr.includes("0.0.0.0/0")) {
-            steps.push({
+        const actionMappings = [
+            {
+                check: () => this._hasOpenPort(rawConfig, 22) || findingsStr.includes("ssh") || findingsStr.includes("port 22")
+                    || structuredFindings.some(f => f.rule_id === 'EC2-002'),
                 action: "RESTRICT_SSH",
-                description: "Revoke SSH (port 22) access from 0.0.0.0/0. Add your trusted IP manually after.",
-                risk_of_change: "High — will block SSH from all IPs."
-            });
-            console.log(`[RemediationPlanner] ➤ RESTRICT_SSH (hasOpenSSH=${hasOpenSSH})`);
-        }
-
-        // 2. Check for other dangerous open ports
-        const hasOpenDangerous = this._hasOpenDangerousPorts(rawConfig);
-        if (hasOpenDangerous || findingsStr.includes("all inbound") || findingsStr.includes("rdp") || findingsStr.includes("3389")) {
-            steps.push({
+                description: "Revoke SSH (port 22) access from 0.0.0.0/0",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'EC2-002')
+            },
+            {
+                check: () => this._hasOpenDangerousPorts(rawConfig) || findingsStr.includes("all inbound") || findingsStr.includes("rdp")
+                    || structuredFindings.some(f => ['EC2-003', 'EC2-004', 'EC2-005'].includes(f.rule_id)),
                 action: "RESTRICT_SECURITY_GROUPS",
                 description: "Revoke dangerous public inbound rules (RDP, databases, all-traffic)",
-                risk_of_change: "High — may break network access."
+                matchingRule: structuredFindings.find(f => ['EC2-003', 'EC2-004', 'EC2-005'].includes(f.rule_id))
+            },
+            {
+                check: () => !rawConfig.imdsv2_required || structuredFindings.some(f => f.rule_id === 'EC2-006'),
+                action: "ENFORCE_IMDSV2",
+                description: "Enforce IMDSv2 (set HttpTokens to 'required')",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'EC2-006')
+            },
+            {
+                check: () => !rawConfig.monitoring_enabled || structuredFindings.some(f => f.rule_id === 'EC2-009'),
+                action: "ENABLE_MONITORING",
+                description: "Enable detailed CloudWatch monitoring",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'EC2-009')
+            },
+            {
+                check: () => (rawConfig.ebs_volumes || []).some(v => !v.encrypted)
+                    || structuredFindings.some(f => f.rule_id === 'EC2-007'),
+                action: "ENCRYPT_EBS_VOLUMES",
+                description: "Encrypt unencrypted EBS volumes (manual — requires snapshot+copy)",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'EC2-007')
+            },
+        ];
+
+        for (const mapping of actionMappings) {
+            if (!mapping.check()) continue;
+
+            const finding = mapping.matchingRule || {
+                rule_id: 'LEGACY',
+                title: mapping.description,
+                severity: 'MEDIUM',
+                confidence: 0.8
+            };
+
+            const decision = decisionEngine.classify({
+                finding,
+                rawConfig,
+                action: mapping.action,
+                resourceType: 'EC2'
             });
-            console.log(`[RemediationPlanner] ➤ RESTRICT_SECURITY_GROUPS (hasOpenDangerous=${hasOpenDangerous})`);
+
+            steps.push({
+                action: mapping.action,
+                description: mapping.description,
+                decision: decision.decision,
+                reasoning: decision.reasoning,
+                confidence: decision.confidence,
+                risk_of_change: decision.risk_of_change,
+                reversible: decision.reversible,
+                rule_id: finding.rule_id,
+                severity: finding.severity,
+                ui_display: decision.ui_display
+            });
         }
 
-        // 3. IMDSv2 — check raw config directly
-        const imdsv2Required = rawConfig.imdsv2_required === true ||
-            rawConfig.metadata_options?.HttpTokens === "required";
-        if (!imdsv2Required || findingsStr.includes("imds") || findingsStr.includes("metadata")) {
-            if (!imdsv2Required) {
-                steps.push({
-                    action: "ENFORCE_IMDSV2",
-                    description: "Enforce IMDSv2 (set HttpTokens to 'required')",
-                    risk_of_change: "Low"
-                });
-                console.log(`[RemediationPlanner] ➤ ENFORCE_IMDSV2`);
+        const plan = {
+            plan_id: `plan_ec2_${Date.now()}`,
+            service: "ec2",
+            resource: instanceId,
+            status: "PENDING_APPROVAL",
+            steps,
+            summary: {
+                total_steps: steps.length,
+                auto_fix: steps.filter(s => s.decision === 'AUTO_FIX').length,
+                suggest_fix: steps.filter(s => s.decision === 'SUGGEST_FIX').length,
+                intentional_skip: steps.filter(s => s.decision === 'INTENTIONAL_SKIP').length,
             }
-        }
+        };
 
-        // 4. Monitoring — check raw config directly
-        const monitoringEnabled = rawConfig.monitoring_enabled === true;
-        if (!monitoringEnabled || findingsStr.includes("monitoring") || findingsStr.includes("cloudwatch")) {
-            if (!monitoringEnabled) {
-                steps.push({
-                    action: "ENABLE_MONITORING",
-                    description: "Enable detailed CloudWatch monitoring",
-                    risk_of_change: "None"
-                });
-                console.log(`[RemediationPlanner] ➤ ENABLE_MONITORING`);
-            }
-        }
+        const impactReport = impactAnalyzer.analyze(plan, rawConfig, 'EC2');
+        plan.impact = impactReport;
 
-        // 5. EBS Encryption
-        const hasUnencrypted = (rawConfig.ebs_volumes || []).some(v => !v.encrypted);
-        if (hasUnencrypted || findingsStr.includes("ebs") || findingsStr.includes("encrypt") || findingsStr.includes("volume")) {
-            if (hasUnencrypted) {
-                steps.push({
-                    action: "ENCRYPT_EBS_VOLUMES",
-                    description: "Encrypt unencrypted EBS volumes (manual — requires snapshot+copy)",
-                    risk_of_change: "Manual action required."
-                });
-                console.log(`[RemediationPlanner] ➤ ENCRYPT_EBS_VOLUMES`);
-            }
-        }
-
-        console.log(`[RemediationPlanner] EC2 plan: ${steps.length} step(s) for ${instanceId}`);
-
-        return { plan_id: `plan_ec2_${Date.now()}`, service: "ec2", resource: instanceId, status: "PENDING_APPROVAL", steps };
+        return plan;
     }
 
-    // ─── Helpers to inspect raw security group rules ─────────────────
+    // ─── Helpers ─────────────────────────────────────────────────────
+
+    _parseRawConfig(rawConfig) {
+        if (!rawConfig) return {};
+        if (typeof rawConfig === 'string') {
+            try { return JSON.parse(rawConfig); } catch { return {}; }
+        }
+        return rawConfig;
+    }
+
+    _getStructuredFindings(scanResult) {
+        if (scanResult.structured_findings) {
+            const parsed = typeof scanResult.structured_findings === 'string'
+                ? JSON.parse(scanResult.structured_findings)
+                : scanResult.structured_findings;
+            return Array.isArray(parsed) ? parsed : [];
+        }
+        return [];
+    }
 
     _hasOpenPort(rawConfig, targetPort) {
         if (!rawConfig.security_groups || !Array.isArray(rawConfig.security_groups)) return false;
-
         for (const sg of rawConfig.security_groups) {
             for (const rule of (sg.inbound_rules || [])) {
                 const hasOpenCidr = (rule.ip_ranges || []).includes("0.0.0.0/0") ||
                     (rule.ipv6_ranges || []).includes("::/0");
                 if (!hasOpenCidr) continue;
-
-                // All traffic
                 if (rule.protocol === "-1") return true;
-
-                // Specific port range
                 if (rule.from_port !== undefined && rule.to_port !== undefined &&
-                    rule.from_port <= targetPort && rule.to_port >= targetPort) {
-                    return true;
-                }
+                    rule.from_port <= targetPort && rule.to_port >= targetPort) return true;
             }
         }
         return false;
@@ -148,20 +250,14 @@ class RemediationPlannerAgent {
     _hasOpenDangerousPorts(rawConfig) {
         const dangerousPorts = [3389, 3306, 5432, 1433, 27017, 6379];
         if (!rawConfig.security_groups || !Array.isArray(rawConfig.security_groups)) return false;
-
         for (const sg of rawConfig.security_groups) {
             for (const rule of (sg.inbound_rules || [])) {
                 const hasOpenCidr = (rule.ip_ranges || []).includes("0.0.0.0/0") ||
                     (rule.ipv6_ranges || []).includes("::/0");
                 if (!hasOpenCidr) continue;
-
                 if (rule.protocol === "-1") return true;
-
                 for (const port of dangerousPorts) {
-                    if (rule.from_port !== undefined && rule.to_port !== undefined &&
-                        rule.from_port <= port && rule.to_port >= port) {
-                        return true;
-                    }
+                    if (rule.from_port <= port && rule.to_port >= port) return true;
                 }
             }
         }
