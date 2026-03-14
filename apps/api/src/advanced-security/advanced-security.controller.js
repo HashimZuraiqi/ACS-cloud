@@ -73,13 +73,13 @@ exports.getSecurityInsights = async (req, res) => {
         // Feed everything into threat reasoning
         const avgScore = [...s3, ...ec2, ...iam].reduce((sum, s) => sum + (s.risk_score || 0), 0) / Math.max([...s3, ...ec2, ...iam].length, 1);
 
-        const reasoning = threatReasoning.reason({
+        const reasoning = threatReasoning.analyze({
             attackPaths: attackPathResults.attack_paths,
             toxicCombinations: toxicResults.combinations,
             anomalies: anomalyResults.anomalies,
             secrets: secretResults.secrets,
             mitreResults: mitreResults,
-            privilegeEscalations: privEscResults,
+            escalations: privEscResults,
             overallRiskScore: Math.round(avgScore),
             resourceCounts: { s3: s3.length, ec2: ec2.length, iam: iam.length }
         });
@@ -197,7 +197,13 @@ exports.getThreatAnalysis = async (req, res) => {
             attackPaths: attackPaths.attack_paths || [],
             toxicCombinations: combinations.combinations || [],
             anomalies: anomalies.anomalies || [],
-            scanFindings: [...s3, ...ec2, ...iam]
+            scanFindings: [...s3, ...ec2, ...iam],
+            cloudTrail: cloudTrail.anomalies || [],
+            escalations: escalations || [],
+            chains: chains.chains || [],
+            data: data.findings || [],
+            ueba: ueba.anomalies || [],
+            network: network.risks || []
         });
         
         res.json(result);
