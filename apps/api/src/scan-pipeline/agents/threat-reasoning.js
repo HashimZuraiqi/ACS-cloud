@@ -8,14 +8,14 @@
 class ThreatReasoningEngine {
     /**
      * Analyze security data and reasoning about overall threat posture
-     * @param {Object} data - Contains attackPaths, toxicCombinations, anomalies, scanFindings
+     * @param {Object} data 
      * @returns {Object} - The generated reasoning reports
      */
-    analyze({ attackPaths = [], toxicCombinations = [], anomalies = [], scanFindings = [] }) {
-        console.log('[ThreatReasoningEngine] Analyzing threat landscape...');
+    analyze({ attackPaths = [], toxicCombinations = [], anomalies = [], scanFindings = [], cloudTrail = [], escalations = [], chains = [], data = [], ueba = [], network = [] }) {
+        console.log('[ThreatReasoningEngine] Analyzing deep threat landscape...');
 
-        const executiveSummary = this._generateExecutiveSummary(attackPaths, toxicCombinations, anomalies, scanFindings);
-        const technicalAnalysis = this._generateTechnicalAnalysis(attackPaths, toxicCombinations, anomalies, scanFindings);
+        const executiveSummary = this._generateExecutiveSummary(attackPaths, toxicCombinations, anomalies, scanFindings, cloudTrail, escalations, chains, data, ueba, network);
+        const technicalAnalysis = this._generateTechnicalAnalysis(attackPaths, toxicCombinations, anomalies, scanFindings, cloudTrail, escalations, chains, data, ueba, network);
 
         return {
             type: "AI_THREAT_ANALYSIS",
@@ -25,35 +25,41 @@ class ThreatReasoningEngine {
         };
     }
 
-    _generateExecutiveSummary(attackPaths, toxicCombinations, anomalies, scanFindings) {
+    _generateExecutiveSummary(attackPaths, toxicCombinations, anomalies, scanFindings, cloudTrail, escalations, chains, data, ueba, network) {
         let impact = 'Low';
         let explanation = 'No significant threats detected in the current infrastructure.';
 
-        if (attackPaths.length > 0 || toxicCombinations.length > 0) {
+        const totalCriticals = attackPaths.length + toxicCombinations.length + escalations.length + chains.length + network.length;
+        const totalAnomalies = anomalies.length + cloudTrail.length + ueba.length;
+
+        if (totalCriticals > 0) {
             impact = 'Critical';
-            explanation = `Detected ${attackPaths.length} potential attack path(s) and ${toxicCombinations.length} toxic combination(s) that could allow attackers to compromise critical assets. Immediate remediation is recommended to reduce business risk.`;
-        } else if (anomalies.length > 0 || scanFindings.length > 0) {
+            explanation = `Detected ${totalCriticals} critical vulnerability combinations (including Attack Paths, Privilege Escalations, and Exploit Chains) that could allow direct compromise of business assets. Immediate remediation of the root causes is strongly recommended to reduce blast radius.`;
+        } else if (totalAnomalies > 0 || data.length > 0 || scanFindings.length > 0) {
             impact = 'Medium';
-            explanation = `Detected suspicious behaviors or misconfigurations. While no direct attack paths to critical assets were found, these issues increase the overall attack surface.`;
+            explanation = `Detected ${totalAnomalies} suspicious behavioral anomalies and ${data.length} instances of potential data exposure. While no complete network exploit chains were mapped, these indicators mandate investigation against established baselines.`;
         }
 
         return {
             business_explanation: explanation,
-            impact_description: `Business Risk Level: ${impact}. Potential exposure of sensitive data or unauthorized access to system resources.`
+            impact_description: `Business Risk Level: ${impact}. ${totalCriticals > 0 ? 'High probability of unauthorized system control.' : 'Potential exposure of sensitive information or unauthorized recon.'}`
         };
     }
 
-    _generateTechnicalAnalysis(attackPaths, toxicCombinations, anomalies, scanFindings) {
-        const attackChainExplanation = attackPaths.length > 0 
-            ? `Attackers could exploit interconnected vulnerabilities to traverse the network. Example: ${attackPaths[0].description || attackPaths[0].name || 'Initial access leading to privilege escalation.'}`
-            : 'No complete attack chains discovered.';
+    _generateTechnicalAnalysis(attackPaths, toxicCombinations, anomalies, scanFindings, cloudTrail, escalations, chains, data, ueba, network) {
+        const attackChainExplanation = (attackPaths.length > 0 || chains.length > 0 || network.length > 0 || escalations.length > 0)
+            ? `Attackers could string together network misconfigurations and IAM overprivilege to traverse the environment. Example Vector: ${chains[0]?.description || attackPaths[0]?.description || escalations[0]?.description || network[0]?.description || 'Multi-step lateral movement detected.'}`
+            : 'No complete cross-boundary attack chains discovered.';
 
         const exploitedVulnerabilities = [];
         
-        // Add toxic combination descriptions
-        toxicCombinations.forEach(tc => {
-             exploitedVulnerabilities.push(`Toxic Combination: ${tc.description || tc.name || 'Correlated vulnerabilities across resources.'}`);
-        });
+        toxicCombinations.forEach(tc => exploitedVulnerabilities.push(`Toxic Combo: ${tc.description || tc.name}`));
+        chains.forEach(c => exploitedVulnerabilities.push(`Exploit Chain: ${c.description || c.name}`));
+        escalations.forEach(e => exploitedVulnerabilities.push(`Privilege Flow: ${e.description || e.vector}`));
+        data.forEach(d => exploitedVulnerabilities.push(`Exposure: ${d.evidence}`));
+        cloudTrail.forEach(c => exploitedVulnerabilities.push(`Behavior: ${c.description}`));
+        ueba.forEach(u => exploitedVulnerabilities.push(`Anomaly: ${u.description}`));
+        network.forEach(n => exploitedVulnerabilities.push(`Routing Risk: ${n.description || n.name}`));
 
         // Add critical/high scan findings
         scanFindings.forEach(f => {
@@ -63,12 +69,14 @@ class ThreatReasoningEngine {
         });
 
         let priority = 'Low';
-        if (attackPaths.length > 0) priority = 'Critical - Address attack paths immediately';
-        else if (toxicCombinations.length > 0) priority = 'High - Break toxic combinations';
-        else if (anomalies.length > 0 || exploitedVulnerabilities.length > 0) priority = 'Medium - Investigate anomalies and fix misconfigurations';
+        const totalCriticals = attackPaths.length + toxicCombinations.length + escalations.length + chains.length + network.length;
+
+        if (totalCriticals > 0) priority = 'Critical - Sever attack chains and remove escalated shadow admins immediately';
+        else if (data.length > 0) priority = 'High - Rotate exposed credentials and encrypt PII targets';
+        else if (cloudTrail.length > 0 || ueba.length > 0 || anomalies.length > 0 || exploitedVulnerabilities.length > 0) priority = 'Medium - Investigate UEBA deviations and harden core misconfigurations';
 
         // Deduplicate and limit vulnerabilities
-        const uniqueVulns = [...new Set(exploitedVulnerabilities)].slice(0, 10);
+        const uniqueVulns = [...new Set(exploitedVulnerabilities)].slice(0, 15);
 
         return {
             attack_chain_explanation: attackChainExplanation,

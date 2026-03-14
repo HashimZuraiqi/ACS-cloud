@@ -82,8 +82,8 @@ class PDFReportGenerator {
         // Navy background header bar
         doc.rect(0, 0, doc.page.width, 320).fill(COLORS.primary);
 
-        // Shield icon (text-based)
-        doc.fontSize(60).fillColor(COLORS.accent).text('🛡️', 0, 80, { align: 'center' });
+        // Logo (Text-based instead of broken emoji)
+        doc.fontSize(40).fillColor(COLORS.accent).text('[ CLOUDGUARD ]', 0, 80, { align: 'center', characterSpacing: 5 });
 
         // Title
         doc.fontSize(32).fillColor(COLORS.white)
@@ -186,7 +186,7 @@ class PDFReportGenerator {
         this._tableHeader(doc, ['Service', 'Count', 'At Risk', 'Secure']);
         infra.services.forEach(svc => {
             this._tableRow(doc, [
-                `${svc.icon} ${svc.name}`,
+                `${svc.name.replace(/[^\w\s-]/g, '').trim()}`,
                 String(svc.count),
                 String(svc.at_risk),
                 String(svc.count - svc.at_risk)
@@ -195,7 +195,7 @@ class PDFReportGenerator {
         this._tableRow(doc, ['TOTAL', String(infra.total), '', ''], true);
 
         doc.moveDown(0.5);
-        if (infra.regions.length > 0) {
+        if (infra.regions && infra.regions.length > 0) {
             doc.fontSize(9).fillColor(COLORS.muted)
                 .text(`Regions: ${infra.regions.join(', ')}`);
         }
@@ -267,12 +267,13 @@ class PDFReportGenerator {
         this._tableHeader(doc, ['Framework', 'Controls', 'Passing', 'Failing', 'Score']);
         fwNames.forEach(name => {
             const fw = frameworks[name];
+            if (!fw) return;
             this._tableRow(doc, [
                 name,
-                String(fw.total_controls),
-                String(fw.passing),
-                String(fw.failing),
-                `${fw.compliance_percent}%`
+                String(fw.total_controls || 0),
+                String(fw.passing || 0),
+                String(fw.failing || 0),
+                `${fw.compliance_percent || 0}%`
             ]);
         });
 
@@ -296,16 +297,43 @@ class PDFReportGenerator {
 
         // Action table (latest 10)
         this._tableHeader(doc, ['Action', 'Resource', 'Decision', 'Status']);
+        let appliedFixes = [];
         rh.actions.slice(-10).forEach(a => {
             this._tableRow(doc, [
                 a.action,
                 this._truncate(a.resource, 25),
-                a.decision || '',
-                a.status
+                a.decision || 'N/A',
+                a.status || 'UNKNOWN'
             ]);
+            if (a.status === 'SUCCESS' || a.status === 'ALREADY_COMPLIANT') {
+                appliedFixes.push(a);
+            }
         });
 
         doc.moveDown(1);
+
+        // Optional Section: Applied Fixes vs Remaining Recommendations
+        if (appliedFixes.length > 0 || data.vulnerabilities.items.length > 0) {
+            this._ensureSpace(doc, 150);
+            this._subHeader(doc, 'Remediation Gap Analysis');
+            
+            doc.fontSize(10).fillColor(COLORS.success).text('Applied Auto-Fixes:');
+            appliedFixes.forEach(a => doc.fontSize(9).fillColor(COLORS.text).text(`- ${a.action} (${a.status})`, { indent: 15 }));
+            if (appliedFixes.length === 0) doc.fontSize(9).fillColor(COLORS.muted).text('- None applied recently.', { indent: 15 });
+
+            doc.moveDown(0.5);
+            doc.fontSize(10).fillColor(COLORS.warning).text('Remaining Recommendations:');
+            
+            // Show lower-priority or manual recommendations that remain
+            const remaining = data.vulnerabilities.items.filter(v => 
+                v.severity !== 'CRITICAL' || v.title.toLowerCase().includes('recommendation') || v.title.toLowerCase().includes('sse-s3') || v.title.toLowerCase().includes('encryption')
+            ).slice(0, 10);
+            
+            remaining.forEach(r => doc.fontSize(9).fillColor(COLORS.text).text(`- ${r.title} [${r.severity}]`, { indent: 15 }));
+            if (remaining.length === 0) doc.fontSize(9).fillColor(COLORS.muted).text('- No pending recommendations discovered.', { indent: 15 });
+            
+            doc.moveDown(1);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -349,9 +377,9 @@ class PDFReportGenerator {
             const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             doc.fontSize(8).fillColor(COLORS.muted).text(timeStr, 50, y + 3, { width: 25 });
 
-            // Event details
+            // Event details (no emoji rendering)
             doc.fontSize(9).fillColor(COLORS.primary)
-                .text(`${event.icon} ${event.description}`, lineX + 15, y + 2, { width: 400 });
+                .text(`[${event.type}] ${event.description}`, lineX + 15, y + 2, { width: 400 });
             doc.fontSize(8).fillColor(COLORS.muted)
                 .text(`${event.resource}${event.risk_score !== undefined ? ` — Risk: ${event.risk_score}/100` : ''}`, lineX + 15, doc.y);
 
@@ -419,7 +447,7 @@ class PDFReportGenerator {
 
         instructions.forEach(inst => {
             this._ensureSpace(doc, 40);
-            doc.fontSize(9).fillColor(COLORS.primary).text(`▸ ${inst.title}`);
+            doc.fontSize(9).fillColor(COLORS.primary).text(`- ${inst.title}`);
             // Code block
             const codeY = doc.y;
             doc.roundedRect(60, codeY, 480, 18, 3).fill('#F4F6F8');

@@ -13,7 +13,7 @@
 // Actions that are always safe (additive, non-breaking)
 const SAFE_ACTIONS = new Set([
     'ENABLE_ENCRYPTION', 'ENABLE_VERSIONING', 'ENABLE_LOGGING',
-    'ENABLE_MONITORING', 'ENFORCE_IMDSV2'
+    'ENABLE_MONITORING', 'ENFORCE_IMDSV2', 'ENABLE_LIFECYCLE'
 ]);
 
 // Actions that can break applications if applied blindly
@@ -57,6 +57,14 @@ class RemediationDecisionEngine {
         // Stage 1: Check if this is an intentional configuration
         const intentionalCheck = this._checkIntentional(finding, rawConfig, action, resourceType, context);
         if (intentionalCheck) return intentionalCheck;
+
+        // Stage 1.5: If this is explicitly a manual recommendation, route to SUGGEST_FIX early
+        if (finding.remediationMode === 'MANUAL_RECOMMENDATION') {
+            return this._buildDecision('SUGGEST_FIX', action, finding,
+                `This finding is categorized as a manual recommendation. Automated execution is disabled to ensure safety.`,
+                1.0, 'LOW', context
+            );
+        }
 
         // Stage 2: Check if the action is safe (additive, non-breaking)
         if (SAFE_ACTIONS.has(action)) {

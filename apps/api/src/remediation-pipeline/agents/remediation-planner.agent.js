@@ -1,5 +1,6 @@
 const decisionEngine = require('./remediation-decision-engine');
 const impactAnalyzer = require('./impact-analyzer');
+const riskScorer = require('../../scan-pipeline/agents/risk-scorer.agent');
 
 class RemediationPlannerAgent {
 
@@ -58,6 +59,12 @@ class RemediationPlannerAgent {
                 description: "Enable S3 access logging",
                 matchingRule: structuredFindings.find(f => f.rule_id === 'S3-009')
             },
+            {
+                check: () => structuredFindings.some(f => f.rule_id === 'S3-010'),
+                action: "ENABLE_LIFECYCLE",
+                description: "Create default storage lifecycle rules",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-010')
+            },
         ];
 
         for (const mapping of actionMappings) {
@@ -91,17 +98,35 @@ class RemediationPlannerAgent {
             });
         }
 
+        const autoFixCount = steps.filter(s => s.decision === 'AUTO_FIX').length;
+
+        // Predict risk score by removing auto-fixed findings
+        const currentScore = scanResult.risk_score || 0;
+        const autoFixRuleIds = steps.filter(s => s.decision === 'AUTO_FIX').map(s => s.rule_id);
+        const remainingFindings = structuredFindings.filter(f => !autoFixRuleIds.includes(f.rule_id));
+        const predictedScoreResult = riskScorer.calculateWeighted(remainingFindings, rawConfig, scanResult);
+        const predictedScore = predictedScoreResult.score;
+
+        let status = "PENDING_APPROVAL";
+        if (autoFixCount === 0) {
+            status = "NO_ACTION_NEEDED";
+        } else if (predictedScore >= currentScore) {
+            status = "BLOCKED";
+        }
+
         const plan = {
             plan_id: `plan_s3_${Date.now()}`,
             service: "s3",
             resource: scanResult.bucket,
-            status: "PENDING_APPROVAL",
+            status: status,
             steps,
             summary: {
                 total_steps: steps.length,
-                auto_fix: steps.filter(s => s.decision === 'AUTO_FIX').length,
+                auto_fix: autoFixCount,
                 suggest_fix: steps.filter(s => s.decision === 'SUGGEST_FIX').length,
                 intentional_skip: steps.filter(s => s.decision === 'INTENTIONAL_SKIP').length,
+                current_risk_score: currentScore,
+                predicted_risk_score: predictedScore
             }
         };
 
@@ -192,17 +217,34 @@ class RemediationPlannerAgent {
             });
         }
 
+        const autoFixCount = steps.filter(s => s.decision === 'AUTO_FIX').length;
+
+        const currentScore = scanResult.risk_score || 0;
+        const autoFixRuleIds = steps.filter(s => s.decision === 'AUTO_FIX').map(s => s.rule_id);
+        const remainingFindings = structuredFindings.filter(f => !autoFixRuleIds.includes(f.rule_id));
+        const predictedScoreResult = riskScorer.calculateWeighted(remainingFindings, rawConfig, scanResult);
+        const predictedScore = predictedScoreResult.score;
+
+        let status = "PENDING_APPROVAL";
+        if (autoFixCount === 0) {
+            status = "NO_ACTION_NEEDED";
+        } else if (predictedScore >= currentScore) {
+            status = "BLOCKED";
+        }
+
         const plan = {
             plan_id: `plan_ec2_${Date.now()}`,
             service: "ec2",
             resource: instanceId,
-            status: "PENDING_APPROVAL",
+            status: status,
             steps,
             summary: {
                 total_steps: steps.length,
-                auto_fix: steps.filter(s => s.decision === 'AUTO_FIX').length,
+                auto_fix: autoFixCount,
                 suggest_fix: steps.filter(s => s.decision === 'SUGGEST_FIX').length,
                 intentional_skip: steps.filter(s => s.decision === 'INTENTIONAL_SKIP').length,
+                current_risk_score: currentScore,
+                predicted_risk_score: predictedScore
             }
         };
 

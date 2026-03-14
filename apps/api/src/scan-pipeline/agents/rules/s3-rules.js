@@ -68,6 +68,7 @@ class S3RuleEngine {
                 disabled_settings: disabledSettings
             },
             remediation: 'Enable all four Public Access Block settings on this bucket.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.6', 'CIS:2.1.5', 'NIST:PR.AC-3', 'PCI:1.3.6', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.4.1']
         };
     }
@@ -97,6 +98,7 @@ class S3RuleEngine {
                 }))
             },
             remediation: 'Remove all ACL grants to "AllUsers". Set bucket ACL to private.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.6', 'CIS:2.1.5', 'NIST:PR.AC-3', 'NIST:PR.DS-5', 'PCI:7.1', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.4.1']
         };
     }
@@ -126,6 +128,7 @@ class S3RuleEngine {
                 }))
             },
             remediation: 'Remove ACL grants to "AuthenticatedUsers". This group includes every AWS account.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC6.1', 'CIS:2.1.5', 'NIST:PR.AC-3', 'HIPAA:164.312(a)(1)']
         };
     }
@@ -161,6 +164,7 @@ class S3RuleEngine {
                 }))
             },
             remediation: 'Restrict bucket policy to specific IAM principals. Remove or condition wildcard Allow statements.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.6', 'CIS:2.1.5', 'NIST:PR.AC-3', 'PCI:7.1', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.4.1']
         };
     }
@@ -192,6 +196,7 @@ class S3RuleEngine {
                 total_statements: statements.length
             },
             remediation: 'Add a Deny statement with Condition: {"Bool": {"aws:SecureTransport": "false"}} to enforce HTTPS.',
+            remediationMode: 'MANUAL_RECOMMENDATION',
             compliance: ['SOC2:CC6.7', 'CIS:2.1.1', 'NIST:SC-8', 'PCI:4.1', 'HIPAA:164.312(e)(1)']
         };
     }
@@ -211,6 +216,7 @@ class S3RuleEngine {
                 encryption_status: config.encryption || 'NOT_CONFIGURED'
             },
             remediation: 'Enable default SSE-S3 (AES-256) or SSE-KMS encryption on the bucket.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC6.1', 'CIS:2.1.1', 'NIST:SC-28', 'PCI:3.4', 'HIPAA:164.312(a)(2)(iv)', 'ISO27001:A.10.1.1']
         };
     }
@@ -244,6 +250,7 @@ class S3RuleEngine {
                     recommended: 'aws:kms'
                 },
                 remediation: 'Switch to SSE-KMS encryption for better key management, rotation, and CloudTrail audit logging.',
+                remediationMode: 'MANUAL_RECOMMENDATION',
                 compliance: ['NIST:SC-12', 'PCI:3.5']
             };
         }
@@ -267,6 +274,7 @@ class S3RuleEngine {
                 versioning_status: config.versioning?.Status || 'Disabled'
             },
             remediation: 'Enable bucket versioning to protect against accidental data loss and enable MFA delete.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:A1.2', 'CIS:2.1.3', 'NIST:CP-9', 'ISO27001:A.12.3.1']
         };
     }
@@ -286,6 +294,7 @@ class S3RuleEngine {
                 logging_status: config.logging ? 'Partial' : 'Not configured'
             },
             remediation: 'Enable S3 server access logging to a dedicated logging bucket for audit compliance.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC7.2', 'CIS:2.1.3', 'NIST:AU-2', 'PCI:10.1', 'HIPAA:164.312(b)', 'ISO27001:A.12.4.1']
         };
     }
@@ -305,6 +314,7 @@ class S3RuleEngine {
                 lifecycle_rules: 0
             },
             remediation: 'Create lifecycle rules to transition old objects to cheaper storage classes and expire obsolete data.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['NIST:MP-6', 'ISO27001:A.8.3.2']
         };
     }
@@ -331,6 +341,7 @@ class S3RuleEngine {
                 total_cors_rules: config.cors.length
             },
             remediation: 'Restrict CORS AllowedOrigins to specific trusted domains instead of wildcard (*).',
+            remediationMode: 'MANUAL_RECOMMENDATION',
             compliance: ['SOC2:CC6.6', 'NIST:SC-7', 'ISO27001:A.13.1.1']
         };
     }
@@ -372,6 +383,7 @@ class S3RuleEngine {
                 unconditioned_statements: crossAccount.length
             },
             remediation: 'Add Condition keys (e.g., aws:SourceVpce, aws:SourceIp, aws:MultiFactorAuthPresent) to cross-account Allow statements.',
+            remediationMode: 'MANUAL_RECOMMENDATION',
             compliance: ['SOC2:CC6.3', 'CIS:1.16', 'NIST:AC-3']
         };
     }
@@ -403,6 +415,7 @@ class S3RuleEngine {
                 }
             },
             remediation: 'Enable ALL four Public Access Block settings for consistent protection.',
+            remediationMode: 'AUTO_FIX',
             compliance: ['SOC2:CC6.1', 'CIS:2.1.5']
         };
     }

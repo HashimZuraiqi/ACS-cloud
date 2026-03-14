@@ -1,0 +1,11 @@
+TypeError: Cannot read properties of undefined (reading 'length')
+    at PDFReportGenerator._renderInfrastructureOverview (C:\Users\FBDGA\OneDrive\Desktop\New_imagine\ACS-cloud\apps\api\src\reporting-pipeline\pdf-report-generator.js:198:27)
+    at C:\Users\FBDGA\OneDrive\Desktop\New_imagine\ACS-cloud\apps\api\src\reporting-pipeline\pdf-report-generator.js:62:22
+    at new Promise (<anonymous>)
+    at PDFReportGenerator.generate (C:\Users\FBDGA\OneDrive\Desktop\New_imagine\ACS-cloud\apps\api\src\reporting-pipeline\pdf-report-generator.js:43:16)
+    at run (C:\Users\FBDGA\OneDrive\Desktop\New_imagine\ACS-cloud\apps\api\test-pdf.js:22:28)
+    at Object.<anonymous> (C:\Users\FBDGA\OneDrive\Desktop\New_imagine\ACS-cloud\apps\api\test-pdf.js:28:1)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)

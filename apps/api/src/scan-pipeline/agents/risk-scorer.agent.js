@@ -131,13 +131,23 @@ class RiskScorerAgent {
     _computeBaseSeverity(findings) {
         if (findings.length === 0) return 0;
 
-        // Use the worst finding's score, boosted by number of findings
-        const scores = findings.map(f => SEVERITY_SCORES[f.severity] || 50);
-        const maxScore = Math.max(...scores);
-        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        // Base score is the absolute worst finding
+        const scores = findings.map(f => SEVERITY_SCORES[f.severity] || 50).sort((a, b) => b - a);
+        const maxScore = scores[0];
 
-        // Weighted: 70% worst finding + 30% average (multiple issues compound risk)
-        return Math.round(maxScore * 0.7 + avgScore * 0.3);
+        // Additive penalty for additional findings (10% of their base severity added on top)
+        // This ensures the score strictly INCREASES with more vulnerabilities, never decreases.
+        let additionalPenalty = 0;
+        for (let i = 1; i < scores.length; i++) {
+            // Further penalize, but reduce compounding effect for 10+ findings
+            additionalPenalty += (scores[i] * 0.10);
+        }
+
+        // Also scale down the impact of MANUAL_RECOMMENDATION items from the final score
+        // to prevent recommendations from inherently inflating the "Critical Risk" baseline.
+        const recommendationPenaltyDiscount = findings.filter(f => f.remediationMode === 'MANUAL_RECOMMENDATION').length * 2;
+
+        return Math.round(Math.min(100, maxScore + additionalPenalty - recommendationPenaltyDiscount));
     }
 
     _computeExploitability(findings, rawConfig) {

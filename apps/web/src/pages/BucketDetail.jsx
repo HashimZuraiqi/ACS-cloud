@@ -54,10 +54,17 @@ const BucketDetail = () => {
   const [downloading, setDownloading] = useState(false);
   const [prevScore, setPrevScore] = useState(null);
 
-  const fetchScan = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getScanResult(scanId);
+    const fetchScan = async () => {
+      try {
+        setLoading(true);
+        const data = await api.getScanResult(scanId);
+        
+        let smartPlan = { steps: [], status: 'NO_ACTION_NEEDED' };
+        try {
+          smartPlan = await api.getSmartPlan(scanId, 's3');
+        } catch (err) {
+          console.error('[BucketDetail] Failed to load smart plan:', err);
+        }
 
       const mapped = {
         scanId: data.scan_id,
@@ -76,13 +83,8 @@ const BucketDetail = () => {
           standard: "SOC 2",
           requirement: f
         })),
-        remediationPlan: data.remediation ? [{
-          id: 'rem-1',
-          title: 'Enforce Security Controls',
-          description: data.remediation,
-          type: 'automated',
-          priority: 'high'
-        }] : []
+        remediationPlan: smartPlan.steps || [],
+        planStatus: smartPlan.status
       };
 
       setScanResult(mapped);
@@ -254,13 +256,14 @@ const BucketDetail = () => {
           {scanResult.remediationPlan?.length > 0 && (
             <Button
               onClick={() => setShowApprovalModal(true)}
-              className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/20 border-0"
+              disabled={scanResult.planStatus === 'BLOCKED' || scanResult.planStatus === 'NO_ACTION_NEEDED'}
+              className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Approve & Apply Fixes
+              {scanResult.planStatus === 'BLOCKED' ? "Remediation Blocked" : "Approve & Apply Fixes"}
             </Button>
           )}
         </div>
-        <RemediationPlan actions={scanResult.remediationPlan} />
+        <RemediationPlan actions={scanResult.remediationPlan} planStatus={scanResult.planStatus} />
       </motion.div>
 
       <ApprovalModal open={showApprovalModal} onOpenChange={setShowApprovalModal} scanId={scanResult.scanId} resourceName={scanResult.bucketName} actionCount={scanResult.remediationPlan?.length || 0} serviceType="s3" onDone={handleRemediationDone} />

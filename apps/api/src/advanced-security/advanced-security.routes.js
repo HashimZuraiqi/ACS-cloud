@@ -10,4 +10,12 @@ router.get('/toxic-combos', controller.getToxicCombos);
 router.get('/secrets', controller.getSecrets);
 router.get('/threat-analysis', controller.getThreatAnalysis);
 
+// Deep Vulnerability Discovery Endpoints
+router.get('/cloudtrail', controller.getCloudtrail);
+router.get('/escalations', controller.getEscalations);
+router.get('/attack-chains', controller.getAttackChains);
+router.get('/data-exposure', controller.getDataExposure);
+router.get('/behavior-anomalies', controller.getBehaviorAnomalies);
+router.get('/network-risks', controller.getNetworkRisks);
+
 module.exports = router;

@@ -14,7 +14,9 @@ const {
     GetBucketVersioningCommand,
     PutBucketLoggingCommand,
     GetBucketLoggingCommand,
-    HeadBucketCommand
+    HeadBucketCommand,
+    PutBucketLifecycleConfigurationCommand,
+    GetBucketLifecycleConfigurationCommand
 } = require("@aws-sdk/client-s3");
 
 class ExecutionAgent {
@@ -137,6 +139,8 @@ class ExecutionAgent {
                 return await this._enableVersioning(bucketName, s3Client);
             case "ENABLE_LOGGING":
                 return await this._enableLogging(bucketName, s3Client);
+            case "ENABLE_LIFECYCLE":
+                return await this._enableLifecycle(bucketName, s3Client);
             default:
                 return { action: step.action, status: "SKIPPED", message: `Unknown action: ${step.action}` };
         }
@@ -364,6 +368,45 @@ class ExecutionAgent {
         } catch (err) {
             return { action: "ENABLE_LOGGING", status: "WARNING", message: `Logging setup requires log delivery permissions: ${err.message}` };
         }
+    }
+
+    async _enableLifecycle(bucketName, s3Client) {
+        try {
+            const current = await s3Client.send(new GetBucketLifecycleConfigurationCommand({ Bucket: bucketName }));
+            if (current.Rules && current.Rules.length > 0) {
+                return {
+                    action: "ENABLE_LIFECYCLE",
+                    status: "ALREADY_COMPLIANT",
+                    message: "Lifecycle Policy Already Configured — Skipped"
+                };
+            }
+        } catch (err) { /* proceed */ }
+
+        const safeDefaultRule = {
+            ID: "CloudGuard-Default-Cost-Optimization",
+            Status: "Enabled",
+            Filter: { Prefix: "" }, // Apply to all objects
+            Transitions: [{
+                Days: 90,
+                StorageClass: "STANDARD_IA"
+            }],
+            AbortIncompleteMultipartUpload: {
+                DaysAfterInitiation: 7
+            }
+        };
+
+        await s3Client.send(new PutBucketLifecycleConfigurationCommand({
+            Bucket: bucketName,
+            LifecycleConfiguration: { Rules: [safeDefaultRule] }
+        }));
+
+        return {
+            action: "ENABLE_LIFECYCLE",
+            status: "SUCCESS",
+            message: "Applied safe default lifecycle policy (Standard-IA transition after 90 days)",
+            before: { lifecycle: 'None' },
+            after: { lifecycle: 'STANDARD_IA at 90 days, abort multipart at 7 days' }
+        };
     }
 }
 

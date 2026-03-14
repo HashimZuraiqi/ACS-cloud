@@ -41,6 +41,13 @@ const EC2Detail = () => {
             setLoading(true);
             const data = await api.getEC2ScanResult(scanId);
 
+            let smartPlan = { steps: [], status: 'NO_ACTION_NEEDED' };
+            try {
+                smartPlan = await api.getSmartPlan(scanId, 'ec2');
+            } catch (err) {
+                console.error('[EC2Detail] Failed to load smart plan:', err);
+            }
+
             const rawConfig = JSON.parse(data.raw_config || '{}');
 
             const mapped = {
@@ -59,13 +66,8 @@ const EC2Detail = () => {
                     standard: "SOC 2 / CIS",
                     requirement: f
                 })),
-                remediationPlan: data.remediation ? [{
-                    id: 'rem-1',
-                    title: 'Enforce EC2 Security Controls',
-                    description: data.remediation,
-                    type: 'automated',
-                    priority: 'high'
-                }] : []
+                remediationPlan: smartPlan.steps || [],
+                planStatus: smartPlan.status
             };
 
             setScanResult(mapped);
@@ -196,13 +198,14 @@ const EC2Detail = () => {
                     {scanResult.remediationPlan?.length > 0 && (
                         <Button
                             onClick={() => setShowApprovalModal(true)}
-                            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 border-0"
+                            disabled={scanResult.planStatus === 'BLOCKED' || scanResult.planStatus === 'NO_ACTION_NEEDED'}
+                            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Approve & Auto Fix
+                            {scanResult.planStatus === 'BLOCKED' ? "Remediation Blocked" : "Approve & Auto Fix"}
                         </Button>
                     )}
                 </div>
-                <RemediationPlan actions={scanResult.remediationPlan} />
+                <RemediationPlan actions={scanResult.remediationPlan} planStatus={scanResult.planStatus} />
             </motion.div>
 
             <ApprovalModal

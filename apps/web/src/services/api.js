@@ -75,6 +75,11 @@ export const api = {
         return response.data;
     },
 
+    getSmartPlan: async (scanId, service = 's3') => {
+        const response = await client.post('/remediate/smart-plan', { scanId, service });
+        return response.data;
+    },
+
     approveFix: async (scanId) => {
         const response = await client.post('/remediate/approve', { scanId });
         return response.data;

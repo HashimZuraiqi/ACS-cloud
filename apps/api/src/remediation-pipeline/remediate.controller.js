@@ -74,6 +74,13 @@ exports.approveFix = async (req, res) => {
         // 2. Generate smart plan
         const plan = planner.createPlan(scanResult.Item);
 
+        if (plan.status === 'BLOCKED' || plan.status === 'NO_ACTION_NEEDED') {
+            const msg = plan.status === 'BLOCKED' 
+                ? "Remediation blocked: predicted score would not improve."
+                : "No further automated fixes are available.";
+            return res.status(400).json({ error: msg, plan });
+        }
+
         // 3. Filter steps: only execute AUTO_FIX and explicitly approved SUGGEST_FIX
         const approvedSet = new Set(approvedSteps || []);
         const stepsToExecute = plan.steps.filter(step =>
@@ -158,6 +165,13 @@ exports.approveEC2Fix = async (req, res) => {
 
         const instanceId = scanResult.Item.instance_id;
         const plan = planner.createEC2Plan(scanResult.Item);
+
+        if (plan.status === 'BLOCKED' || plan.status === 'NO_ACTION_NEEDED') {
+            const msg = plan.status === 'BLOCKED' 
+                ? "Remediation blocked: predicted score would not improve."
+                : "No further automated fixes are available.";
+            return res.status(400).json({ error: msg, plan });
+        }
 
         const approvedSet = new Set(approvedSteps || []);
         const stepsToExecute = plan.steps.filter(s =>

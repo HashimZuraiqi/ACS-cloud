@@ -12,6 +12,15 @@ const anomalyDetector = require('../scan-pipeline/agents/anomaly-detector');
 const toxicCombinations = require('../scan-pipeline/agents/toxic-combinations');
 const secretsDetector = require('../scan-pipeline/agents/secrets-detector');
 const threatReasoning = require('../scan-pipeline/agents/threat-reasoning');
+
+// Deep Vulnerability Discovery Engines
+const cloudtrailAnalyzer = require('../scan-pipeline/agents/cloudtrail-analyzer');
+const iamEscalationGraph = require('../scan-pipeline/agents/iam-escalation-graph');
+const crossServiceAnalyzer = require('../scan-pipeline/agents/cross-service-analyzer');
+const dataDiscovery = require('../scan-pipeline/agents/data-discovery');
+const uebaAnalyzer = require('../scan-pipeline/agents/ueba-analyzer');
+const networkChainAnalyzer = require('../scan-pipeline/agents/network-chain-analyzer');
+
 const { docClient } = require('../config/db');
 const { ScanCommand } = require("@aws-sdk/lib-dynamodb");
 
@@ -171,11 +180,17 @@ exports.getThreatAnalysis = async (req, res) => {
         const { s3, ec2, iam } = await fetchAllScans(req.user.email);
         
         // Run other analyzers as threatReasoning depends on them
-        const [attackPaths, combinations, anomalies, secrets] = await Promise.all([
+        const [attackPaths, combinations, anomalies, secrets, cloudTrail, escalations, chains, data, ueba, network] = await Promise.all([
              Promise.resolve(attackPathAnalyzer.analyze({ s3Scans: s3, ec2Scans: ec2, iamScans: iam })),
              Promise.resolve(toxicCombinations.detect({ s3Scans: s3, ec2Scans: ec2, iamScans: iam })),
              Promise.resolve(anomalyDetector.detect({ s3Scans: s3, ec2Scans: ec2, iamScans: iam })),
-             Promise.resolve(secretsDetector.scan({ s3Scans: s3, ec2Scans: ec2, iamScans: iam, lambdaScans: [], cloudformationScans: [] }))
+             Promise.resolve(secretsDetector.scan({ s3Scans: s3, ec2Scans: ec2, iamScans: iam, lambdaScans: [], cloudformationScans: [] })),
+             Promise.resolve(cloudtrailAnalyzer.analyze({ events: [] })),
+             Promise.resolve(iamEscalationGraph.analyze({ iamScans: iam })),
+             Promise.resolve(crossServiceAnalyzer.detect({ s3Scans: s3, ec2Scans: ec2, iamScans: iam })),
+             Promise.resolve(dataDiscovery.scan({ s3Scans: s3, ec2Scans: ec2 })),
+             Promise.resolve(uebaAnalyzer.analyze({ accessLogs: [] })),
+             Promise.resolve(networkChainAnalyzer.analyze({ vpcConfigs: [] }))
         ]);
         
         const result = threatReasoning.analyze({
@@ -189,4 +204,67 @@ exports.getThreatAnalysis = async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+};
+
+/**
+ * GET /api/security/cloudtrail
+ */
+exports.getCloudtrail = async (req, res) => {
+    try {
+        const result = cloudtrailAnalyzer.analyze({ events: [] });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+/**
+ * GET /api/security/escalations
+ */
+exports.getEscalations = async (req, res) => {
+    try {
+        const { iam } = await fetchAllScans(req.user.email);
+        const result = iamEscalationGraph.analyze({ iamScans: iam });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+/**
+ * GET /api/security/attack-chains
+ */
+exports.getAttackChains = async (req, res) => {
+    try {
+        const { s3, ec2, iam } = await fetchAllScans(req.user.email);
+        const result = crossServiceAnalyzer.detect({ s3Scans: s3, ec2Scans: ec2, iamScans: iam });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+/**
+ * GET /api/security/data-exposure
+ */
+exports.getDataExposure = async (req, res) => {
+    try {
+        const { s3, ec2 } = await fetchAllScans(req.user.email);
+        const result = dataDiscovery.scan({ s3Scans: s3, ec2Scans: ec2 });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+/**
+ * GET /api/security/behavior-anomalies
+ */
+exports.getBehaviorAnomalies = async (req, res) => {
+    try {
+        const result = uebaAnalyzer.analyze({ accessLogs: [] });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+/**
+ * GET /api/security/network-risks
+ */
+exports.getNetworkRisks = async (req, res) => {
+    try {
+        const result = networkChainAnalyzer.analyze({ vpcConfigs: [] });
+        res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 };
