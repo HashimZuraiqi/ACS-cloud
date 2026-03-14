@@ -101,12 +101,19 @@ class RemediationDecisionEngine {
         const specificDecision = this._classifyByResourceType(finding, rawConfig, action, resourceType, context);
         if (specificDecision) return specificDecision;
 
-        // Stage 6: Default — CRITICAL/HIGH findings get auto-fixed, MEDIUM/LOW get MANUAL_REVIEW
-        if (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') {
-            return this._buildDecision('AUTO_FIX', action, finding,
+        // Stage 6: Default — Respect the finding's built-in remediation_mode if assigned by the scanner
+        if (finding.remediationMode === 'AUTO_FIX' || finding.remediation_mode === 'AUTO_FIX') {
+             return this._buildDecision('AUTO_FIX', action, finding,
                 `${finding.severity} severity finding with no detected intentional configuration. Safe to auto-fix.`,
                 0.9, 'LOW', context
             );
+        }
+
+        if (finding.remediationMode === 'ASSISTED_FIX' || finding.remediation_mode === 'ASSISTED_FIX') {
+            return this._buildDecision('ASSISTED_FIX', action, finding,
+               `CloudGuard will generate CLI/Terraform scripts for this guided fix.`,
+               1.0, 'MEDIUM', context
+           );
         }
 
         return this._buildDecision('MANUAL_REVIEW', action, finding,

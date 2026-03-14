@@ -21,21 +21,21 @@ const RemediationPlan = ({ actions, planStatus, className }) => {
     <div className={cn('bg-card/40 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden', className)}>
       <div className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className={`p-2 rounded-lg ${planStatus === 'BLOCKED' ? 'bg-amber-500/10' : 'bg-orange-500/10'}`}>
-            <Wrench className={`w-5 h-5 ${planStatus === 'BLOCKED' ? 'text-amber-500' : 'text-orange-500'}`} />
+          <div className={`p-2 rounded-lg ${['MANUAL_REVIEW_ONLY', 'ASSISTED_FIX_ONLY', 'BLOCKED'].includes(planStatus) ? 'bg-amber-500/10' : 'bg-orange-500/10'}`}>
+            <Wrench className={`w-5 h-5 ${['MANUAL_REVIEW_ONLY', 'ASSISTED_FIX_ONLY', 'BLOCKED'].includes(planStatus) ? 'text-amber-500' : 'text-orange-500'}`} />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-foreground">
-              {planStatus === 'BLOCKED' ? 'Manual Recommendations Remaining' : 'Remediation Plan'}
+              {planStatus === 'MANUAL_REVIEW_ONLY' ? 'Manual Recommendations Only' : planStatus === 'ASSISTED_FIX_ONLY' ? 'Generate Fix Scripts' : planStatus === 'BLOCKED' ? 'Manual Recommendations Remaining' : 'Remediation Plan'}
             </h3>
             <p className="text-sm text-muted-foreground">{actions.length} finding{actions.length !== 1 ? 's' : ''} reported</p>
           </div>
         </div>
         
-        {planStatus === 'BLOCKED' && (
+        {['MANUAL_REVIEW_ONLY', 'ASSISTED_FIX_ONLY', 'BLOCKED'].includes(planStatus) && (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <p className="text-sm text-amber-400 font-medium whitespace-pre-line">
-              No further automated fixes can be safely applied without potentially increasing the overall risk score (e.g. inflating base severities). The remaining items listed are manual recommendations requiring review.
+              Remaining items require manual review. Automatic fixes have been applied.
             </p>
           </div>
         )}

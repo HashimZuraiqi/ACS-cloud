@@ -149,11 +149,17 @@ class RemediationPlannerAgent {
         const predictedScoreResult = riskScorer.calculateWeighted(remainingFindings, rawConfig, scanResult);
         const predictedScore = predictedScoreResult.score;
 
+        const assistedFixCount = steps.filter(s => s.decision === 'ASSISTED_FIX').length;
+
         let status = "PENDING_APPROVAL";
-        if (autoFixCount === 0) {
+        if (steps.length === 0) {
             status = "NO_ACTION_NEEDED";
-        } else if (predictedScore >= currentScore) {
-            status = "BLOCKED";
+        } else if (autoFixCount > 0) {
+            status = "PENDING_APPROVAL";
+        } else if (assistedFixCount > 0) {
+            status = "ASSISTED_FIX_ONLY";
+        } else {
+            status = "MANUAL_REVIEW_ONLY";
         }
 
         const plan = {
@@ -308,11 +314,17 @@ class RemediationPlannerAgent {
         const predictedScoreResult = riskScorer.calculateWeighted(remainingFindings, rawConfig, scanResult);
         const predictedScore = predictedScoreResult.score;
 
+        const assistedFixCount = steps.filter(s => s.decision === 'ASSISTED_FIX').length;
+
         let status = "PENDING_APPROVAL";
-        if (autoFixCount === 0) {
+        if (steps.length === 0) {
             status = "NO_ACTION_NEEDED";
-        } else if (predictedScore >= currentScore) {
-            status = "BLOCKED";
+        } else if (autoFixCount > 0) {
+            status = "PENDING_APPROVAL";
+        } else if (assistedFixCount > 0) {
+            status = "ASSISTED_FIX_ONLY";
+        } else {
+            status = "MANUAL_REVIEW_ONLY";
         }
 
         const plan = {

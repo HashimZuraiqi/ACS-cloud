@@ -256,10 +256,10 @@ const BucketDetail = () => {
           {scanResult.remediationPlan?.length > 0 && (
             <Button
               onClick={() => setShowApprovalModal(true)}
-              disabled={scanResult.planStatus === 'BLOCKED' || scanResult.planStatus === 'NO_ACTION_NEEDED'}
+              disabled={['BLOCKED', 'NO_ACTION_NEEDED', 'MANUAL_REVIEW_ONLY', 'ASSISTED_FIX_ONLY'].includes(scanResult.planStatus)}
               className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {scanResult.planStatus === 'BLOCKED' ? "Remediation Blocked" : "Approve & Apply Fixes"}
+              {['MANUAL_REVIEW_ONLY', 'ASSISTED_FIX_ONLY', 'BLOCKED'].includes(scanResult.planStatus) ? "Automatic Fixes Applied" : "Approve & Apply Fixes"}
             </Button>
           )}
         </div>

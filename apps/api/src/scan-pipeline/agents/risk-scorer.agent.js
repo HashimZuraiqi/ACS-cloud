@@ -143,11 +143,7 @@ class RiskScorerAgent {
             additionalPenalty += (scores[i] * 0.10);
         }
 
-        // Also scale down the impact of MANUAL_RECOMMENDATION items from the final score
-        // to prevent recommendations from inherently inflating the "Critical Risk" baseline.
-        const recommendationPenaltyDiscount = findings.filter(f => f.remediationMode === 'MANUAL_RECOMMENDATION').length * 2;
-
-        return Math.round(Math.min(100, maxScore + additionalPenalty - recommendationPenaltyDiscount));
+        return Math.round(Math.min(100, maxScore + additionalPenalty));
     }
 
     _computeExploitability(findings, rawConfig) {
