@@ -229,10 +229,10 @@ const EC2Detail = () => {
                     {scanResult.remediationPlan?.length > 0 && (
                         <Button
                             onClick={() => setShowApprovalModal(true)}
-                            disabled={scanResult.planStatus === 'BLOCKED' || scanResult.planStatus === 'NO_ACTION_NEEDED'}
+                            disabled={scanResult.planStatus === 'NO_ACTION_NEEDED'}
                             className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {scanResult.planStatus === 'BLOCKED' ? "Remediation Blocked" : "Approve & Auto Fix"}
+                            {scanResult.planStatus === 'ASSISTED_ONLY' ? "Generate Fix Scripts" : "Approve & Auto Fix"}
                         </Button>
                     )}
                 </div>

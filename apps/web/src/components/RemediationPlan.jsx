@@ -21,36 +21,39 @@ const RemediationPlan = ({ actions, planStatus, className }) => {
     <div className={cn('bg-card/40 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden', className)}>
       <div className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className={`p-2 rounded-lg ${planStatus === 'BLOCKED' ? 'bg-amber-500/10' : 'bg-orange-500/10'}`}>
-            <Wrench className={`w-5 h-5 ${planStatus === 'BLOCKED' ? 'text-amber-500' : 'text-orange-500'}`} />
+          <div className={`p-2 rounded-lg ${planStatus === 'ASSISTED_ONLY' ? 'bg-blue-500/10' : 'bg-orange-500/10'}`}>
+            <Wrench className={`w-5 h-5 ${planStatus === 'ASSISTED_ONLY' ? 'text-blue-500' : 'text-orange-500'}`} />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-foreground">
-              {planStatus === 'BLOCKED' ? 'Manual Recommendations Remaining' : 'Remediation Plan'}
+              {planStatus === 'ASSISTED_ONLY' ? 'Generate Fix Scripts' : 'Remediation Plan'}
             </h3>
             <p className="text-sm text-muted-foreground">{actions.length} finding{actions.length !== 1 ? 's' : ''} reported</p>
           </div>
         </div>
         
-        {planStatus === 'BLOCKED' && (
-          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-            <p className="text-sm text-amber-400 font-medium whitespace-pre-line">
-              No further automated fixes can be safely applied without potentially increasing the overall risk score (e.g. inflating base severities). The remaining items listed are manual recommendations requiring review.
+        {planStatus === 'ASSISTED_ONLY' && (
+          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <p className="text-sm text-blue-400 font-medium whitespace-pre-line">
+              Remaining items require manual review. Automatic fixes have been applied. Use the guided CLI/Terraform scripts below to remediate.
             </p>
           </div>
         )}
 
-        <div className="space-y-3">
-          {actions.map((action, index) => {
-            const uniqueId = action.rule_id || `act-${index}`;
-            const isExpanded = expandedActions.has(uniqueId); 
-            const isCopied = copiedCommand === uniqueId; 
+        {(() => {
+          const autoFixActions = actions.filter(a => a.decision === 'AUTO_FIX');
+          const manualActions = actions.filter(a => a.decision !== 'AUTO_FIX' && a.decision !== 'INTENTIONAL_SKIP');
+          const skippedActions = actions.filter(a => a.decision === 'INTENTIONAL_SKIP');
+
+          const renderAction = (action, index, globalIndex) => {
+            const uniqueId = action.rule_id || `act-${globalIndex}`;
+            const isExpanded = expandedActions.has(uniqueId);
             const ui = action.ui_display || {};
 
             return (
               <div key={uniqueId} className="border border-white/10 rounded-xl overflow-hidden hover:border-white/20 transition-colors bg-white/5">
                 <button onClick={() => toggleAction(uniqueId)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-3"><div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 border border-white/20 text-xs font-bold text-muted-foreground">{index + 1}</div>
+                  <div className="flex items-center gap-3"><div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 border border-white/20 text-xs font-bold text-muted-foreground">{globalIndex + 1}</div>
                     <div className="text-left flex items-center gap-4">
                       <h4 className="font-semibold text-foreground">{action.title}</h4>
                       <span className={cn('text-xs px-2 py-0.5 rounded-full border font-bold tracking-wide uppercase', getBadgeStyle(action.decision))}>
@@ -101,8 +104,35 @@ const RemediationPlan = ({ actions, planStatus, className }) => {
                 )}
               </div>
             );
-          })}
-        </div>
+          };
+
+          let globalIdx = 0;
+          return (
+            <div className="space-y-6">
+              {autoFixActions.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                    ✨ Automatic Fixes ({autoFixActions.length})
+                  </h4>
+                  {autoFixActions.map((a, i) => renderAction(a, i, globalIdx++))}
+                </div>
+              )}
+              {manualActions.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2 mt-4">
+                    👁️ Manual Recommendations ({manualActions.length})
+                  </h4>
+                  {autoFixActions.length > 0 && (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg mb-2">
+                      <p className="text-xs text-emerald-400 font-medium">All safe automated fixes have been applied. Remaining items require manual review.</p>
+                    </div>
+                  )}
+                  {manualActions.map((a, i) => renderAction(a, i, globalIdx++))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

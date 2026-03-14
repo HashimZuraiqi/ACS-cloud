@@ -74,11 +74,16 @@ exports.approveFix = async (req, res) => {
         // 2. Generate smart plan
         const plan = planner.createPlan(scanResult.Item);
 
-        if (plan.status === 'BLOCKED' || plan.status === 'NO_ACTION_NEEDED') {
-            const msg = plan.status === 'BLOCKED' 
-                ? "Remediation blocked: predicted score would not improve."
-                : "No further automated fixes are available.";
-            return res.status(400).json({ error: msg, plan });
+        if (plan.status === 'NO_ACTION_NEEDED') {
+            return res.status(400).json({ error: "No actionable findings to fix.", plan });
+        }
+
+        if (plan.status === 'ASSISTED_ONLY') {
+            return res.json({
+                status: 'ASSISTED_ONLY',
+                message: 'Remaining items require manual review. Generate fix scripts below.',
+                plan
+            });
         }
 
         // 3. Filter steps: only execute AUTO_FIX and explicitly approved SUGGEST_FIX
@@ -166,11 +171,16 @@ exports.approveEC2Fix = async (req, res) => {
         const instanceId = scanResult.Item.instance_id;
         const plan = planner.createEC2Plan(scanResult.Item);
 
-        if (plan.status === 'BLOCKED' || plan.status === 'NO_ACTION_NEEDED') {
-            const msg = plan.status === 'BLOCKED' 
-                ? "Remediation blocked: predicted score would not improve."
-                : "No further automated fixes are available.";
-            return res.status(400).json({ error: msg, plan });
+        if (plan.status === 'NO_ACTION_NEEDED') {
+            return res.status(400).json({ error: "No actionable findings to fix.", plan });
+        }
+
+        if (plan.status === 'ASSISTED_ONLY') {
+            return res.json({
+                status: 'ASSISTED_ONLY',
+                message: 'Remaining items require manual review. Generate fix scripts below.',
+                plan
+            });
         }
 
         const approvedSet = new Set(approvedSteps || []);

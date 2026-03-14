@@ -1,6 +1,5 @@
 const decisionEngine = require('./remediation-decision-engine');
 const impactAnalyzer = require('./impact-analyzer');
-const riskScorer = require('../../scan-pipeline/agents/risk-scorer.agent');
 const assistedFixGenerator = require('./assisted-fix.agent');
 
 class RemediationPlannerAgent {
@@ -65,6 +64,13 @@ class RemediationPlannerAgent {
                 action: "ENABLE_LIFECYCLE",
                 description: "Create default storage lifecycle rules",
                 matchingRule: structuredFindings.find(f => f.rule_id === 'S3-010')
+            },
+            {
+                check: () => findingsStr.includes("https") || findingsStr.includes("securetransport")
+                    || structuredFindings.some(f => f.rule_id === 'S3-005'),
+                action: "ENFORCE_HTTPS",
+                description: "Add HTTPS-only deny policy (aws:SecureTransport)",
+                matchingRule: structuredFindings.find(f => f.rule_id === 'S3-005')
             },
         ];
 
@@ -141,20 +147,23 @@ class RemediationPlannerAgent {
         }
 
         const autoFixCount = steps.filter(s => s.decision === 'AUTO_FIX').length;
+        const assistedFixCount = steps.filter(s => s.decision === 'ASSISTED_FIX').length;
+        const manualReviewCount = steps.filter(s => s.decision === 'MANUAL_REVIEW' || s.decision === 'SUGGEST_FIX').length;
 
-        // Predict risk score by removing auto-fixed findings
-        const currentScore = scanResult.risk_score || 0;
-        const autoFixRuleIds = steps.filter(s => s.decision === 'AUTO_FIX').map(s => s.rule_id);
-        const remainingFindings = structuredFindings.filter(f => !autoFixRuleIds.includes(f.rule_id));
-        const predictedScoreResult = riskScorer.calculateWeighted(remainingFindings, rawConfig, scanResult);
-        const predictedScore = predictedScoreResult.score;
-
-        let status = "PENDING_APPROVAL";
-        if (autoFixCount === 0) {
-            status = "NO_ACTION_NEEDED";
-        } else if (predictedScore >= currentScore) {
-            status = "BLOCKED";
+        // New rule set:
+        // 1. If AUTO_FIX findings exist → allow remediation
+        // 2. If only ASSISTED_FIX/MANUAL_REVIEW remain → show "Generate Fix Scripts"
+        // 3. If nothing actionable → NO_ACTION_NEEDED
+        let status = 'PENDING_APPROVAL';
+        if (autoFixCount > 0) {
+            status = 'PENDING_APPROVAL';
+        } else if (assistedFixCount > 0 || manualReviewCount > 0) {
+            status = 'ASSISTED_ONLY';
+        } else {
+            status = 'NO_ACTION_NEEDED';
         }
+
+        const currentScore = scanResult.risk_score || 0;
 
         const plan = {
             plan_id: `plan_s3_${Date.now()}`,
@@ -165,10 +174,11 @@ class RemediationPlannerAgent {
             summary: {
                 total_steps: steps.length,
                 auto_fix: autoFixCount,
+                assisted_fix: assistedFixCount,
+                manual_review: manualReviewCount,
                 suggest_fix: steps.filter(s => s.decision === 'SUGGEST_FIX').length,
                 intentional_skip: steps.filter(s => s.decision === 'INTENTIONAL_SKIP').length,
                 current_risk_score: currentScore,
-                predicted_risk_score: predictedScore
             }
         };
 
@@ -301,19 +311,19 @@ class RemediationPlannerAgent {
         }
 
         const autoFixCount = steps.filter(s => s.decision === 'AUTO_FIX').length;
+        const assistedFixCount = steps.filter(s => s.decision === 'ASSISTED_FIX').length;
+        const manualReviewCount = steps.filter(s => s.decision === 'MANUAL_REVIEW' || s.decision === 'SUGGEST_FIX').length;
+
+        let status = 'PENDING_APPROVAL';
+        if (autoFixCount > 0) {
+            status = 'PENDING_APPROVAL';
+        } else if (assistedFixCount > 0 || manualReviewCount > 0) {
+            status = 'ASSISTED_ONLY';
+        } else {
+            status = 'NO_ACTION_NEEDED';
+        }
 
         const currentScore = scanResult.risk_score || 0;
-        const autoFixRuleIds = steps.filter(s => s.decision === 'AUTO_FIX').map(s => s.rule_id);
-        const remainingFindings = structuredFindings.filter(f => !autoFixRuleIds.includes(f.rule_id));
-        const predictedScoreResult = riskScorer.calculateWeighted(remainingFindings, rawConfig, scanResult);
-        const predictedScore = predictedScoreResult.score;
-
-        let status = "PENDING_APPROVAL";
-        if (autoFixCount === 0) {
-            status = "NO_ACTION_NEEDED";
-        } else if (predictedScore >= currentScore) {
-            status = "BLOCKED";
-        }
 
         const plan = {
             plan_id: `plan_ec2_${Date.now()}`,
@@ -324,10 +334,11 @@ class RemediationPlannerAgent {
             summary: {
                 total_steps: steps.length,
                 auto_fix: autoFixCount,
+                assisted_fix: assistedFixCount,
+                manual_review: manualReviewCount,
                 suggest_fix: steps.filter(s => s.decision === 'SUGGEST_FIX').length,
                 intentional_skip: steps.filter(s => s.decision === 'INTENTIONAL_SKIP').length,
                 current_risk_score: currentScore,
-                predicted_risk_score: predictedScore
             }
         };
 

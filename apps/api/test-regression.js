@@ -38,7 +38,7 @@ async function runTests() {
     const realPlan = planner.createPlan(mockScanResult);
     
     console.log(`Plan Status when only manual fixes exist: ${realPlan.status}`);
-    assert(realPlan.status === 'NO_ACTION_NEEDED' || realPlan.status === 'BLOCKED', "Regression: Plan should be blocked/no_action when only manual recommendations exist");
+    assert(realPlan.status === 'NO_ACTION_NEEDED' || realPlan.status === 'ASSISTED_ONLY', "Regression: Plan should be ASSISTED_ONLY/NO_ACTION when only manual recommendations exist");
 
     // Test 3: PDF Generator doesn't crash on undefined compliance
     const mockReportData = {

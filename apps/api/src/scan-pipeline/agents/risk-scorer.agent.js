@@ -131,50 +131,80 @@ class RiskScorerAgent {
     _computeBaseSeverity(findings) {
         if (findings.length === 0) return 0;
 
-        // Base score is the absolute worst finding
-        const scores = findings.map(f => SEVERITY_SCORES[f.severity] || 50).sort((a, b) => b - a);
-        const maxScore = scores[0];
+        // Separate exploitable findings from recommendation-only findings
+        const RECOMMENDATION_MODES = new Set(['MANUAL_REVIEW', 'ASSISTED_FIX', 'MANUAL_RECOMMENDATION', 'INFORMATIONAL']);
+        const RECOMMENDATION_RULES = new Set(['S3-007', 'S3-011', 'S3-012']); // SSE-KMS upgrade, CORS, cross-account
 
-        // Additive penalty for additional findings (10% of their base severity added on top)
-        // This ensures the score strictly INCREASES with more vulnerabilities, never decreases.
-        let additionalPenalty = 0;
-        for (let i = 1; i < scores.length; i++) {
-            // Further penalize, but reduce compounding effect for 10+ findings
-            additionalPenalty += (scores[i] * 0.10);
+        const exploitable = findings.filter(f => {
+            const mode = f.remediation_mode || f.remediationMode || '';
+            return !RECOMMENDATION_MODES.has(mode) && !RECOMMENDATION_RULES.has(f.rule_id);
+        });
+        const recommendations = findings.filter(f => {
+            const mode = f.remediation_mode || f.remediationMode || '';
+            return RECOMMENDATION_MODES.has(mode) || RECOMMENDATION_RULES.has(f.rule_id);
+        });
+
+        // Exploitable findings: full severity scoring
+        if (exploitable.length > 0) {
+            const scores = exploitable.map(f => SEVERITY_SCORES[f.severity] || 50).sort((a, b) => b - a);
+            const maxScore = scores[0];
+            let additionalPenalty = 0;
+            for (let i = 1; i < scores.length; i++) {
+                additionalPenalty += (scores[i] * 0.10);
+            }
+            // Recommendations add minimal weight (2% of their severity)
+            let recoPenalty = 0;
+            for (const r of recommendations) {
+                recoPenalty += ((SEVERITY_SCORES[r.severity] || 25) * 0.02);
+            }
+            return Math.round(Math.min(100, maxScore + additionalPenalty + recoPenalty));
         }
 
-        // Also scale down the impact of MANUAL_RECOMMENDATION items from the final score
-        // to prevent recommendations from inherently inflating the "Critical Risk" baseline.
-        const recommendationPenaltyDiscount = findings.filter(f => f.remediationMode === 'MANUAL_RECOMMENDATION').length * 2;
+        // Only recommendation findings remain — score should be very low
+        if (recommendations.length > 0) {
+            let recoScore = 0;
+            for (const r of recommendations) {
+                recoScore += ((SEVERITY_SCORES[r.severity] || 25) * 0.05);
+            }
+            return Math.round(Math.min(30, recoScore)); // Cap at 30 for recommendation-only
+        }
 
-        return Math.round(Math.min(100, maxScore + additionalPenalty - recommendationPenaltyDiscount));
+        return 0;
     }
 
     _computeExploitability(findings, rawConfig) {
         let score = 30; // baseline
 
+        // Only count exploitable findings (not recommendations)
+        const exploitable = findings.filter(f => !this._isRecommendationOnly(f));
+
         // Check for publicly-exploitable findings
-        const hasCriticalPublicExposure = findings.some(f =>
+        const hasCriticalPublicExposure = exploitable.some(f =>
             f.rule_id === 'S3-002' || f.rule_id === 'S3-004' ||
             f.rule_id === 'EC2-002' || f.rule_id === 'EC2-003' || f.rule_id === 'EC2-004'
         );
         if (hasCriticalPublicExposure) score += 40;
 
         // IMDSv1 + public IP = SSRF chain
-        const hasIMDSv1 = findings.some(f => f.rule_id === 'EC2-006');
+        const hasIMDSv1 = exploitable.some(f => f.rule_id === 'EC2-006');
         const hasPublicIP = !!rawConfig.public_ip;
         if (hasIMDSv1 && hasPublicIP) score += 25;
 
         // Admin access without MFA
-        const hasAdmin = findings.some(f => f.rule_id === 'IAM-001');
-        const noMFA = findings.some(f => f.rule_id === 'IAM-003');
+        const hasAdmin = exploitable.some(f => f.rule_id === 'IAM-001');
+        const noMFA = exploitable.some(f => f.rule_id === 'IAM-003');
         if (hasAdmin && noMFA) score += 20;
+
+        // If only recommendations remain, lower baseline
+        if (exploitable.length === 0) return 10;
 
         return Math.min(100, score);
     }
 
     _computeBlastRadius(findings, rawConfig) {
         let score = 20; // baseline
+
+        const exploitable = findings.filter(f => !this._isRecommendationOnly(f));
 
         // Sensitive resource naming patterns
         const name = rawConfig.bucket || rawConfig.instance_id || rawConfig.username || '';
@@ -183,13 +213,16 @@ class RiskScorerAgent {
         }
 
         // Admin access = full account blast radius
-        if (findings.some(f => f.rule_id === 'IAM-001' || f.rule_id === 'IAM-002')) {
+        if (exploitable.some(f => f.rule_id === 'IAM-001' || f.rule_id === 'IAM-002')) {
             score += 40;
         }
 
         // Multiple critical findings compound the blast radius
-        const criticals = findings.filter(f => f.severity === 'CRITICAL');
+        const criticals = exploitable.filter(f => f.severity === 'CRITICAL');
         score += Math.min(30, criticals.length * 15);
+
+        // If only recommendations remain, lower baseline
+        if (exploitable.length === 0) return 10;
 
         return Math.min(100, score);
     }
@@ -197,22 +230,24 @@ class RiskScorerAgent {
     _computeExposure(findings, rawConfig) {
         let score = 10; // baseline for any resource
 
+        const exploitable = findings.filter(f => !this._isRecommendationOnly(f));
+
         // S3: Check for public access patterns
         if (rawConfig.bucket) {
-            const isPub = findings.some(f =>
+            const isPub = exploitable.some(f =>
                 f.rule_id === 'S3-001' || f.rule_id === 'S3-002' || f.rule_id === 'S3-004'
             );
             if (isPub) score += 60;
 
             // No encryption on exposed bucket
-            const noEncrypt = findings.some(f => f.rule_id === 'S3-006');
+            const noEncrypt = exploitable.some(f => f.rule_id === 'S3-006');
             if (isPub && noEncrypt) score += 20;
         }
 
         // EC2: Public IP + open SG = high exposure
         if (rawConfig.instance_id) {
             if (rawConfig.public_ip) score += 40;
-            const openSG = findings.some(f =>
+            const openSG = exploitable.some(f =>
                 ['EC2-002', 'EC2-003', 'EC2-004', 'EC2-005'].includes(f.rule_id)
             );
             if (openSG) score += 30;
@@ -222,6 +257,9 @@ class RiskScorerAgent {
         if (rawConfig.username && rawConfig.has_admin_access) {
             score += 50;
         }
+
+        // If only recommendations remain, lower baseline
+        if (exploitable.length === 0) return 5;
 
         return Math.min(100, score);
     }
@@ -289,6 +327,13 @@ class RiskScorerAgent {
             exposure: { value: 0, weight: WEIGHTS.exposure },
             compensating_controls: { value: 0, weight: WEIGHTS.compensatingControls }
         };
+    }
+
+    _isRecommendationOnly(finding) {
+        const RECOMMENDATION_MODES = new Set(['MANUAL_REVIEW', 'ASSISTED_FIX', 'MANUAL_RECOMMENDATION', 'INFORMATIONAL']);
+        const RECOMMENDATION_RULES = new Set(['S3-007', 'S3-011', 'S3-012']);
+        const mode = finding.remediation_mode || finding.remediationMode || '';
+        return RECOMMENDATION_MODES.has(mode) || RECOMMENDATION_RULES.has(finding.rule_id);
     }
 }
 

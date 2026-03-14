@@ -10,16 +10,17 @@
  * whether the resource is production, and whether the config appears intentional.
  */
 
-// Actions that are always safe (additive, non-breaking)
+// Actions that are deterministic security improvements — always AUTO_FIX
 const SAFE_ACTIONS = new Set([
     'ENABLE_ENCRYPTION', 'ENABLE_VERSIONING', 'ENABLE_LOGGING',
-    'ENABLE_MONITORING', 'ENFORCE_IMDSV2', 'ENABLE_LIFECYCLE'
+    'ENABLE_MONITORING', 'ENFORCE_IMDSV2', 'ENABLE_LIFECYCLE',
+    'PUT_PUBLIC_ACCESS_BLOCK', 'REMOVE_PUBLIC_ACLS', 'SANITIZE_BUCKET_POLICY',
+    'RESTRICT_SSH', 'RESTRICT_SECURITY_GROUPS', 'ENFORCE_HTTPS'
 ]);
 
-// Actions that can break applications if applied blindly
+// Actions that genuinely require manual steps (snapshot, user interaction, etc.)
 const RISKY_ACTIONS = new Set([
-    'PUT_PUBLIC_ACCESS_BLOCK', 'REMOVE_PUBLIC_ACLS', 'SANITIZE_BUCKET_POLICY',
-    'RESTRICT_SSH', 'RESTRICT_SECURITY_GROUPS', 'ENCRYPT_EBS_VOLUMES'
+    'ENCRYPT_EBS_VOLUMES'
 ]);
 
 // Patterns in bucket names or tags that suggest intentional public access
@@ -73,45 +74,30 @@ class RemediationDecisionEngine {
             );
         }
 
-        // Stage 2: Check if the action is safe (additive, non-breaking)
+        // Stage 2: Check if the action is a deterministic security improvement
         if (SAFE_ACTIONS.has(action)) {
             return this._buildDecision('AUTO_FIX', action, finding,
-                `"${action}" is an additive change that cannot break existing functionality.`,
+                `"${action}" is a deterministic security improvement. Safe to auto-fix.`,
                 1.0, 'NONE', context
             );
         }
 
-        // Stage 3: Check if the action is risky for production resources
-        if (context.is_production && RISKY_ACTIONS.has(action)) {
-            return this._buildDecision('SUGGEST_FIX', action, finding,
-                `Resource appears to be production (${context.production_signal}). "${action}" could disrupt live services.`,
-                0.9, 'HIGH', context
+        // Stage 3: Risky actions that genuinely need manual steps (e.g. EBS encryption)
+        if (RISKY_ACTIONS.has(action)) {
+            return this._buildDecision('ASSISTED_FIX', action, finding,
+                `"${action}" requires manual infrastructure steps (e.g. snapshots, downtime). Generating guided fix scripts.`,
+                1.0, 'HIGH', context
             );
         }
 
-        // Stage 4: Check if the action is risky and the finding has moderate confidence
-        if (RISKY_ACTIONS.has(action) && (finding.confidence || 1.0) < 0.85) {
-            return this._buildDecision('SUGGEST_FIX', action, finding,
-                `Finding confidence is ${finding.confidence} (below 0.85 threshold). Manual review recommended before applying "${action}".`,
-                0.85, 'MEDIUM', context
-            );
-        }
-
-        // Stage 5: Resource-specific classification
+        // Stage 4: Resource-specific classification
         const specificDecision = this._classifyByResourceType(finding, rawConfig, action, resourceType, context);
         if (specificDecision) return specificDecision;
 
-        // Stage 6: Default — CRITICAL/HIGH findings get auto-fixed, MEDIUM/LOW get MANUAL_REVIEW
-        if (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') {
-            return this._buildDecision('AUTO_FIX', action, finding,
-                `${finding.severity} severity finding with no detected intentional configuration. Safe to auto-fix.`,
-                0.9, 'LOW', context
-            );
-        }
-
-        return this._buildDecision('MANUAL_REVIEW', action, finding,
-            `${finding.severity} severity finding. Review recommended before applying fix.`,
-            0.8, 'LOW', context
+        // Stage 5: Default — auto-fix all severities
+        return this._buildDecision('AUTO_FIX', action, finding,
+            `${finding.severity} severity finding. Safe to auto-fix.`,
+            0.9, 'LOW', context
         );
     }
 
@@ -229,40 +215,13 @@ class RemediationDecisionEngine {
     }
 
     _classifyS3(finding, rawConfig, action, context) {
-        // Blocking public access on a bucket with existing public policy = risky
-        if (action === 'SANITIZE_BUCKET_POLICY' && rawConfig.policy) {
-            const stmtCount = (rawConfig.policy.Statement || []).length;
-            if (stmtCount > 2) {
-                return this._buildDecision('SUGGEST_FIX', action, finding,
-                    `Bucket has a complex policy with ${stmtCount} statements. Automated sanitization may remove legitimate access. Manual review recommended.`,
-                    0.85, 'MEDIUM', context
-                );
-            }
-        }
-
+        // S3 safe fixes are all handled by SAFE_ACTIONS now — no downgrades
         return null;
     }
 
     _classifyEC2(finding, rawConfig, action, context) {
-        // Restricting security groups when instance has many SGs = complex
-        if (action === 'RESTRICT_SECURITY_GROUPS') {
-            const sgCount = (rawConfig.security_groups || []).length;
-            if (sgCount > 3) {
-                return this._buildDecision('SUGGEST_FIX', action, finding,
-                    `Instance has ${sgCount} security groups. Complex SG configuration — manual review recommended to avoid breaking network access.`,
-                    0.8, 'HIGH', context
-                );
-            }
-        }
-
-        // EBS encryption always requires manual steps
-        if (action === 'ENCRYPT_EBS_VOLUMES') {
-            return this._buildDecision('SUGGEST_FIX', action, finding,
-                'EBS encryption requires creating snapshots and new encrypted volumes. Cannot be automated without downtime risk.',
-                1.0, 'HIGH', context
-            );
-        }
-
+        // EBS encryption is in RISKY_ACTIONS and handled at Stage 3 — returns ASSISTED_FIX
+        // All other EC2 fixes are in SAFE_ACTIONS now — no downgrades
         return null;
     }
 

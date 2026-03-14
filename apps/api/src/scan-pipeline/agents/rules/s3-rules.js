@@ -170,9 +170,9 @@ class S3RuleEngine {
                 }))
             },
             remediation: 'Restrict bucket policy to specific IAM principals. Remove or condition wildcard Allow statements.',
-            remediation_mode: 'MANUAL_REVIEW',
-            remediation_reason: 'Modifying bucket policies can break consuming applications.',
-            auto_fix_available: false,
+            remediation_mode: 'AUTO_FIX',
+            remediation_reason: 'Wildcard Allow statements are removed deterministically. Non-wildcard statements are preserved.',
+            auto_fix_available: true,
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.6', 'CIS:2.1.5', 'NIST:PR.AC-3', 'PCI:7.1', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.4.1']
         };
     }
@@ -204,9 +204,9 @@ class S3RuleEngine {
                 total_statements: statements.length
             },
             remediation: 'Add a Deny statement with Condition: {"Bool": {"aws:SecureTransport": "false"}} to enforce HTTPS.',
-            remediation_mode: 'MANUAL_REVIEW',
-            remediation_reason: 'Enforcing HTTPS may break legacy HTTP clients.',
-            auto_fix_available: false,
+            remediation_mode: 'AUTO_FIX',
+            remediation_reason: 'Adding an HTTPS-only deny policy is a safe, additive security improvement.',
+            auto_fix_available: true,
             compliance: ['SOC2:CC6.7', 'CIS:2.1.1', 'NIST:SC-8', 'PCI:4.1', 'HIPAA:164.312(e)(1)']
         };
     }
