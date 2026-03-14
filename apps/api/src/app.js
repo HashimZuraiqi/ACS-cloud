@@ -7,6 +7,7 @@ const ec2ScanRoutes = require('./scan-pipeline/ec2-scan.routes');
 const iamScanRoutes = require('./scan-pipeline/iam-scan.routes');
 const costScanRoutes = require('./scan-pipeline/cost-scan.routes');
 const remediateRoutes = require('./remediation-pipeline/remediate.routes');
+const reportRoutes = require('./reporting-pipeline/report.routes');
 const authRoutes = require('./auth/auth.routes');
 const { verifyToken } = require('./middleware/auth.middleware');
 
@@ -23,6 +24,7 @@ app.use('/api/ec2-scan', verifyToken, ec2ScanRoutes);
 app.use('/api/iam-scan', verifyToken, iamScanRoutes);
 app.use('/api/cost-scan', verifyToken, costScanRoutes);
 app.use('/api/remediate', verifyToken, remediateRoutes);
+app.use('/api/reports', verifyToken, reportRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {
