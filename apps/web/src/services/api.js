@@ -146,5 +146,11 @@ export const api = {
             responseType: 'blob'
         });
         return response.data;
+    },
+
+    // Advanced Security
+    getSecurityInsights: async () => {
+        const response = await client.get('/security/insights');
+        return response.data;
     }
 };

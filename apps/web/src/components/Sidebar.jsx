@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Activity, Settings, Shield } from 'lucide-react';
+import { LayoutDashboard, Activity, Settings, Shield, Radar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Sidebar = ({ className, onCloseMobile }) => {
@@ -8,6 +8,7 @@ const Sidebar = ({ className, onCloseMobile }) => {
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/security', icon: Radar, label: 'Security Insights' },
     { to: '/activity', icon: Activity, label: 'Activity Log' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];

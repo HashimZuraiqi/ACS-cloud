@@ -10,6 +10,7 @@ import Dashboard from '@/pages/Dashboard.jsx';
 import BucketDetail from '@/pages/BucketDetail.jsx';
 import EC2Detail from '@/pages/EC2Detail.jsx';
 import ActivityLog from '@/pages/ActivityLog.jsx';
+import SecurityInsights from '@/pages/SecurityInsights.jsx';
 import Landing from '@/pages/Landing.jsx';
 import Login from '@/pages/Login.jsx';
 import Signup from '@/pages/Signup.jsx';
@@ -117,6 +118,7 @@ function App() {
                 <Route path="/bucket/:scanId" element={<BucketDetail />} />
                 <Route path="/ec2/:scanId" element={<EC2Detail />} />
                 <Route path="/activity" element={<ActivityLog />} />
+                <Route path="/security" element={<SecurityInsights />} />
                 <Route path="/history" element={<Navigate to="/activity" replace />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
