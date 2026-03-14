@@ -93,15 +93,19 @@ exports.getSummary = async (req, res) => {
  */
 exports.downloadResourceReport = async (req, res) => {
     try {
-        const { scanId, service } = req.query;
+        const { scanId, type } = req.query; // type can be s3, ec2, iam, cost
         if (!scanId) return res.status(400).json({ error: 'scanId is required' });
 
-        const tableName = service === 'ec2' ? 'CloudGuard_EC2_Scans' : 'CloudGuard_Scans';
+        let tableName = 'CloudGuard_Scans';
+        if (type === 'ec2') tableName = 'CloudGuard_EC2_Scans';
+        if (type === 'iam') tableName = 'CloudGuard_IAM_Scans';
+        if (type === 'cost') tableName = 'CloudGuard_Cost_Scans';
+
         const result = await docClient.send(new GetCommand({ TableName: tableName, Key: { scan_id: scanId } }));
         if (!result.Item) return res.status(404).json({ error: 'Scan not found' });
 
         const scan = result.Item;
-        const resourceName = scan.bucket || scan.instance_id || scan.username;
+        const resourceName = scan.bucket || scan.instance_id || scan.username || (type === 'cost' ? 'AWS Cost Optimization' : 'Resource');
 
         // Build a single-resource report data object
         const singleReport = {
@@ -109,37 +113,50 @@ exports.downloadResourceReport = async (req, res) => {
                 generated_at: new Date().toISOString(),
                 user_email: req.user.email,
                 platform: 'CloudGuard AI Security',
-                report_id: `RPT-${scanId.substring(0, 8)}`
+                report_id: `RPT-${scanId.substring(0, 8)}`,
+                scan_type: type?.toUpperCase() || 'S3'
             },
             executive_summary: {
-                total_resources: 1,
-                resources_at_risk: scan.status === 'AT_RISK' ? 1 : 0,
-                resources_secure: scan.status === 'SECURE' ? 1 : 0,
-                security_posture: scan.status === 'SECURE' ? 'STRONG' : 'WEAK',
+                total_resources: type === 'cost' ? (scan.resources?.length || 0) : 1,
+                resources_at_risk: scan.status === 'SECURE' || scan.status === 'OPTIMIZED' ? 0 : 1,
+                resources_secure: scan.status === 'SECURE' || scan.status === 'OPTIMIZED' ? 1 : 0,
+                security_posture: scan.status === 'SECURE' || scan.status === 'OPTIMIZED' ? 'STRONG' : 'WEAK',
                 average_risk_score: scan.risk_score || 0,
                 remediations_applied: 0,
                 severity_distribution: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, [scan.severity || 'LOW']: 1 },
-                summary_text: `Security assessment for ${resourceName}. Risk score: ${scan.risk_score || 0}/100. Status: ${scan.status}.`
+                summary_text: type === 'cost' 
+                    ? `Cost Optimization Assessment. Total wasted cost identified: $${scan.total_wasted_cost || 0}/month.`
+                    : `Security assessment for ${resourceName}. Risk score: ${scan.risk_score || 0}/100. Status: ${scan.status}.`
             },
             infrastructure_overview: {
                 services: [
-                    { name: service === 'ec2' ? 'EC2 Instances' : 'S3 Buckets', count: 1, icon: service === 'ec2' ? '🖥️' : '🪣', at_risk: scan.status === 'AT_RISK' ? 1 : 0 }
+                    { 
+                        name: type === 'ec2' ? 'EC2 Instances' : type === 'iam' ? 'IAM Principals' : type === 'cost' ? 'Cost Resources' : 'S3 Buckets', 
+                        count: type === 'cost' ? (scan.resources?.length || 0) : 1, 
+                        icon: type === 'ec2' ? '🖥️' : type === 'iam' ? '🔑' : type === 'cost' ? '💰' : '🪣', 
+                        at_risk: scan.status === 'AT_RISK' || scan.status === 'WASTAGE_DETECTED' ? 1 : 0 
+                    }
                 ],
-                total: 1,
+                total: type === 'cost' ? (scan.resources?.length || 0) : 1,
                 regions: []
             },
-            vulnerabilities: _buildVulns(scan),
+            vulnerabilities: type === 'cost' ? _buildCostVulns(scan) : _buildVulns(scan),
             compliance: _buildCompliance(scan),
             remediation_history: { total_actions: 0, successful: 0, failed: 0, skipped: 0, actions: [] },
             security_timeline: [
-                { timestamp: scan.created_at, type: 'SCAN', icon: '🔍', resource: resourceName, resource_type: service?.toUpperCase() || 'S3', description: `Scan completed — ${scan.status}`, risk_score: scan.risk_score, severity: scan.severity }
+                { timestamp: scan.created_at, type: 'SCAN', icon: '🔍', resource: resourceName, resource_type: type?.toUpperCase() || 'S3', description: `Scan completed — ${scan.status}`, risk_score: scan.risk_score, severity: scan.severity }
             ],
             score_summary: {
-                scores: [{ resource: resourceName, resource_type: service?.toUpperCase() || 'S3', risk_score: scan.risk_score || 0, severity: scan.severity || 'LOW', status: scan.status }],
+                scores: [{ resource: resourceName, resource_type: type?.toUpperCase() || 'S3', risk_score: scan.risk_score || 0, severity: scan.severity || 'LOW', status: scan.status }],
                 average: scan.risk_score || 0,
                 highest: { resource: resourceName, risk_score: scan.risk_score || 0 }
             },
-            raw: { s3: [], ec2: [], iam: [], audit: [] }
+            cost_details: type === 'cost' ? {
+                total_wasted: scan.total_wasted_cost,
+                zombie_volumes: scan.zombie_volumes || 0,
+                idle_instances: scan.idle_instances || 0,
+                items: scan.resources || []
+            } : null
         };
 
         const pdfBuffer = await pdfGenerator.generate(singleReport);
@@ -179,4 +196,24 @@ function _buildCompliance(scan) {
         }
         return { frameworks };
     } catch { return { frameworks: {} }; }
+}
+
+function _buildCostVulns(scan) {
+    const items = [];
+    (scan.resources || []).forEach(r => {
+        items.push({
+            resource: r.resource_id,
+            rule_id: 'COST-WASTE',
+            title: r.status,
+            severity: 'LOW',
+            description: `${r.details}. Estimated Waste: $${r.estimated_monthly_cost}/mo.`,
+            remediation: r.remediation_reason || 'Manual review required',
+            compliance: []
+        });
+    });
+    return {
+        total: items.length,
+        by_severity: { critical: 0, high: 0, medium: 0, low: items.length },
+        items
+    };
 }

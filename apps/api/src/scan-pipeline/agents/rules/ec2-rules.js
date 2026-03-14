@@ -85,6 +85,9 @@ class EC2RuleEngine {
                 public_dns: config.public_dns
             },
             remediation: 'Remove the public IP if internet access is not required. Use a NAT Gateway or VPN for outbound access.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Removing a public IP will immediately disconnect external routes.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'CIS:5.1', 'NIST:SC-7', 'PCI:1.3', 'ISO27001:A.13.1.1']
         };
     }
@@ -110,6 +113,9 @@ class EC2RuleEngine {
                 }))
             },
             remediation: 'Restrict SSH access to specific trusted IP addresses. Use AWS Systems Manager Session Manager as an alternative.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Altering SSH rules can lock out administrators. Use Systems Manager.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.6', 'CIS:5.2', 'NIST:AC-17', 'PCI:1.3.4', 'HIPAA:164.312(e)(1)', 'ISO27001:A.9.4.1']
         };
     }
@@ -135,6 +141,9 @@ class EC2RuleEngine {
                 }))
             },
             remediation: 'Restrict RDP access to specific trusted IP addresses. Use a VPN or bastion host for remote access.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Altering RDP rules can lock out administrators.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'CIS:5.3', 'NIST:AC-17', 'PCI:1.3.4', 'ISO27001:A.9.4.1']
         };
     }
@@ -160,7 +169,10 @@ class EC2RuleEngine {
                             source_cidr: '0.0.0.0/0'
                         },
                         remediation: 'Remove the all-traffic inbound rule. Specify only the ports and protocols required.',
-                        compliance: ['SOC2:CC6.1', 'CIS:5.1', 'NIST:AC-4', 'PCI:1.2.1', 'HIPAA:164.312(e)(1)', 'ISO27001:A.13.1.1']
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Removing open rules requires mapping legitimate inbound traffic first.',
+            auto_fix_available: false,
+            compliance: ['SOC2:CC6.1', 'CIS:5.1', 'NIST:AC-4', 'PCI:1.2.1', 'HIPAA:164.312(e)(1)', 'ISO27001:A.13.1.1']
                     };
                 }
             }
@@ -198,7 +210,10 @@ class EC2RuleEngine {
                         open_security_groups: matches.map(m => m.sg_id)
                     },
                     remediation: `Restrict ${db.name} access to application servers only. Database ports should never be public.`,
-                    compliance: ['SOC2:CC6.1', 'CIS:5.2', 'NIST:SC-7', 'PCI:1.3.6', 'HIPAA:164.312(e)(1)']
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Database connectivity must be carefully mapped to origin subnets.',
+            auto_fix_available: false,
+            compliance: ['SOC2:CC6.1', 'CIS:5.2', 'NIST:SC-7', 'PCI:1.3.6', 'HIPAA:164.312(e)(1)']
                 });
             }
         }
@@ -221,6 +236,9 @@ class EC2RuleEngine {
                 imdsv2_required: false
             },
             remediation: 'Set HttpTokens to "required" in the instance metadata options to enforce IMDSv2.',
+            remediation_mode: 'AUTO_FIX',
+            remediation_reason: 'Enforcing IMDSv2 is generally safe for modern applications.',
+            auto_fix_available: true,
             compliance: ['SOC2:CC6.1', 'CIS:5.6', 'NIST:AC-3', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.4.1']
         };
     }
@@ -248,6 +266,9 @@ class EC2RuleEngine {
                 total_volumes: config.ebs_volumes.length
             },
             remediation: 'Enable EBS encryption. For existing volumes: create an encrypted snapshot, then replace the volume.',
+            remediation_mode: 'ASSISTED_FIX',
+            remediation_reason: 'In-place root volume encryption is not supported; requires snapshot and replace.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'CIS:2.2.1', 'NIST:SC-28', 'PCI:3.4', 'HIPAA:164.312(a)(2)(iv)', 'ISO27001:A.10.1.1']
         };
     }
@@ -267,6 +288,9 @@ class EC2RuleEngine {
                 iam_profile: null
             },
             remediation: 'Create and attach an IAM Instance Profile with least-privilege permissions. Remove any hardcoded credentials.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Creating an IAM profile requires evaluating what permissions the app needs.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.3', 'CIS:1.18', 'NIST:IA-2', 'ISO27001:A.9.2.3']
         };
     }
@@ -286,6 +310,9 @@ class EC2RuleEngine {
                 monitoring_state: 'basic'
             },
             remediation: 'Enable detailed monitoring for 1-minute granularity metrics and better anomaly detection.',
+            remediation_mode: 'AUTO_FIX',
+            remediation_reason: 'Enabling detailed monitoring is a safe configuration change.',
+            auto_fix_available: true,
             compliance: ['SOC2:CC7.2', 'CIS:4.1', 'NIST:SI-4', 'ISO27001:A.12.4.1']
         };
     }
@@ -308,6 +335,9 @@ class EC2RuleEngine {
                 is_default_vpc: true
             },
             remediation: 'Migrate the instance to a custom VPC with properly configured subnets, route tables, and network ACLs.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Migrating VPCs requires architecture planning and downtime.',
+            auto_fix_available: false,
             compliance: ['CIS:5.1', 'NIST:SC-7', 'ISO27001:A.13.1.1']
         };
     }
@@ -333,7 +363,10 @@ class EC2RuleEngine {
                             destination: '0.0.0.0/0'
                         },
                         remediation: 'Restrict outbound rules to only required destinations and ports.',
-                        compliance: ['NIST:SC-7', 'PCI:1.3.5']
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Restricting egress requires strict knowledge of external dependencies.',
+            auto_fix_available: false,
+            compliance: ['NIST:SC-7', 'PCI:1.3.5']
                     };
                 }
             }
@@ -365,7 +398,10 @@ class EC2RuleEngine {
                             ports_open: portRange + 1
                         },
                         remediation: 'Narrow the port range to only the specific ports required by the application.',
-                        compliance: ['SOC2:CC6.1', 'CIS:5.2', 'NIST:AC-4', 'PCI:1.2.1']
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Port ranges must be mapped to application requirements before restricting.',
+            auto_fix_available: false,
+            compliance: ['SOC2:CC6.1', 'CIS:5.2', 'NIST:AC-4', 'PCI:1.2.1']
                     };
                 }
             }

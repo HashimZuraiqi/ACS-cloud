@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, ShieldAlert, FileJson, BrainCircuit, CheckCircle2, AlertTriangle, Server } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, ShieldAlert, FileJson, BrainCircuit, CheckCircle2, AlertTriangle, Server, Download } from 'lucide-react';
+
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button.jsx';
 import { useToast } from '@/components/ui/use-toast';
@@ -35,6 +36,7 @@ const EC2Detail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showApprovalModal, setShowApprovalModal] = useState(false);
+    const [downloading, setDownloading] = useState(false);
 
     const fetchScan = async () => {
         try {
@@ -90,6 +92,26 @@ const EC2Detail = () => {
         }
     };
 
+    const handleDownloadPDF = async () => {
+        try {
+            setDownloading(true);
+            const blob = await api.downloadResourceReport(scanId, 'ec2');
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cloudguard-security-report-${scanResult?.instanceId || 'report'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            toast({ title: "Report Downloaded", description: "Security report saved as PDF", variant: "success" });
+        } catch (err) {
+            toast({ title: "Download Failed", description: err.message, variant: "destructive" });
+        } finally {
+            setDownloading(false);
+        }
+    };
+
     if (loading) {
         return (<div className="flex items-center justify-center h-[calc(100vh-200px)]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div></div>);
     }
@@ -111,9 +133,18 @@ const EC2Detail = () => {
 
     return (
         <div className="space-y-8 pb-12">
-            <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
+            <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="flex items-center justify-between">
                 <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-muted-foreground hover:text-foreground pl-0 hover:bg-transparent -ml-2 mb-2 group">
                     <ArrowLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />Back to Dashboard
+                </Button>
+                <Button
+                    onClick={handleDownloadPDF}
+                    disabled={downloading}
+                    variant="outline"
+                    className="gap-2 border-orange-500/30 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300"
+                >
+                    <Download className="w-4 h-4" />
+                    {downloading ? 'Generating...' : 'Download Security Report'}
                 </Button>
             </motion.div>
 

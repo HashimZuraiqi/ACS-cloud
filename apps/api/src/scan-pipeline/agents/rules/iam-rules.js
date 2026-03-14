@@ -70,6 +70,9 @@ class IAMRuleEngine {
                 total_policies: config.attached_policies.length
             },
             remediation: 'Replace AdministratorAccess with specific, bounded IAM policies following least-privilege principle.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Detaching AdministratorAccess can unexpectedly break critical pipelines.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.3', 'CIS:1.16', 'NIST:AC-6', 'PCI:7.1', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.2.3']
         };
     }
@@ -99,6 +102,9 @@ class IAMRuleEngine {
                 has_admin: true
             },
             remediation: 'Remove AdministratorAccess immediately. Deactivate access keys. If user still needs access, issue bounded time-limited credentials.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Deactivating admin users requires verifying they are not system accounts.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'SOC2:CC6.2', 'CIS:1.3', 'NIST:AC-2', 'PCI:8.1.4', 'HIPAA:164.312(a)(1)', 'ISO27001:A.9.2.6']
         };
     }
@@ -124,6 +130,9 @@ class IAMRuleEngine {
                 has_password: config.password_last_used !== null
             },
             remediation: 'Enable MFA (virtual or hardware) for this IAM user immediately.',
+            remediation_mode: 'ASSISTED_FIX',
+            remediation_reason: 'Enforcing MFA requires user coordination.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'CIS:1.2', 'NIST:IA-2(1)', 'PCI:8.3', 'HIPAA:164.312(d)', 'ISO27001:A.9.4.2']
         };
     }
@@ -144,6 +153,9 @@ class IAMRuleEngine {
                 access_key_age_days: config.access_key_age_days
             },
             remediation: 'Rotate the access key: create a new key, update all applications, then deactivate and delete the old key.',
+            remediation_mode: 'ASSISTED_FIX',
+            remediation_reason: 'Rotating keys requires updating the applications using them before deleting the old ones.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.1', 'CIS:1.4', 'NIST:IA-5', 'PCI:8.2.4', 'ISO27001:A.9.2.4']
         };
     }
@@ -167,6 +179,9 @@ class IAMRuleEngine {
                 keys: activeKeys.map(k => ({ id: k.AccessKeyId, status: k.Status }))
             },
             remediation: 'Deactivate and delete the unused access key. Maintain only one active key per user.',
+            remediation_mode: 'AUTO_FIX',
+            remediation_reason: 'Deactivating a clearly unused second key is safe.',
+            auto_fix_available: true,
             compliance: ['CIS:1.13', 'NIST:IA-5']
         };
     }
@@ -195,6 +210,9 @@ class IAMRuleEngine {
                 total_inline_policies: config.inline_policies.length
             },
             remediation: 'Review and replace inline policies with managed policies. Remove any overly permissive inline policies.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Replacing inline policies requires carefully mapping needed actions.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.3', 'CIS:1.16', 'NIST:AC-6']
         };
     }
@@ -216,6 +234,9 @@ class IAMRuleEngine {
                 access_key_last_used: null
             },
             remediation: 'Confirm if the user account is still needed. If not, delete the IAM user and associated access keys.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Deleting an unused user should be confirmed first.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.2', 'CIS:1.3', 'NIST:AC-2', 'PCI:8.1.4', 'ISO27001:A.9.2.6']
         };
     }
@@ -242,6 +263,9 @@ class IAMRuleEngine {
                 days_since_use: daysSinceKeyUse
             },
             remediation: 'Deactivate and delete the unused access key.',
+            remediation_mode: 'AUTO_FIX',
+            remediation_reason: 'Deactivating a stale key unused for over 90 days is safe.',
+            auto_fix_available: true,
             compliance: ['SOC2:CC6.2', 'CIS:1.4', 'NIST:AC-2', 'PCI:8.1.4']
         };
     }
@@ -271,6 +295,9 @@ class IAMRuleEngine {
                 total_policies: config.attached_policies.length
             },
             remediation: 'Replace broad policies (e.g., *FullAccess) with custom policies granting only required permissions.',
+            remediation_mode: 'MANUAL_REVIEW',
+            remediation_reason: 'Restricting over-permissive policies requires testing.',
+            auto_fix_available: false,
             compliance: ['SOC2:CC6.3', 'CIS:1.16', 'NIST:AC-6', 'PCI:7.1.2', 'ISO27001:A.9.2.3']
         };
     }

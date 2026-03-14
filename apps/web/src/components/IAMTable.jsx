@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2, Download } from 'lucide-react';
 
 const getRiskColor = (level) => {
     switch (level?.toLowerCase()) {
@@ -16,7 +16,7 @@ const getStatusColor = (status) => {
     return 'text-red-400 flex items-center gap-1.5';
 };
 
-const IAMTable = ({ users = [] }) => {
+const IAMTable = ({ users = [], onDownload }) => {
     if (users.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
@@ -42,6 +42,7 @@ const IAMTable = ({ users = [] }) => {
                         <th className="px-6 py-4 font-semibold tracking-wider">Inactive Days</th>
                         <th className="px-6 py-4 font-semibold tracking-wider">Risk Level</th>
                         <th className="px-6 py-4 font-semibold tracking-wider">Compliance</th>
+                        <th className="px-6 py-4 font-semibold tracking-wider text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -114,6 +115,15 @@ const IAMTable = ({ users = [] }) => {
                                             <><AlertTriangle className="w-4 h-4" /> Non-Compliant</>
                                         )}
                                     </div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); if (onDownload) onDownload(user.scanId, 'iam'); }} 
+                                        className="p-2 text-muted-foreground hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors" 
+                                        title="Download Security Report"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                    </button>
                                 </td>
                             </tr>
                         );

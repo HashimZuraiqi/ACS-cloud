@@ -58,11 +58,18 @@ class RemediationDecisionEngine {
         const intentionalCheck = this._checkIntentional(finding, rawConfig, action, resourceType, context);
         if (intentionalCheck) return intentionalCheck;
 
-        // Stage 1.5: If this is explicitly a manual recommendation, route to SUGGEST_FIX early
-        if (finding.remediationMode === 'MANUAL_RECOMMENDATION') {
-            return this._buildDecision('SUGGEST_FIX', action, finding,
-                `This finding is categorized as a manual recommendation. Automated execution is disabled to ensure safety.`,
-                1.0, 'LOW', context
+        // Stage 1.5: If this is explicitly manual/assisted, route early
+        if (finding.remediation_mode === 'MANUAL_REVIEW') {
+            return this._buildDecision('MANUAL_REVIEW', action, finding,
+                finding.remediation_reason || `This finding is categorized as a manual recommendation.`,
+                1.0, 'HIGH', context
+            );
+        }
+
+        if (finding.remediation_mode === 'ASSISTED_FIX') {
+            return this._buildDecision('ASSISTED_FIX', action, finding,
+                finding.remediation_reason || `CloudGuard will generate CLI/Terraform scripts for this guided fix.`,
+                1.0, 'MEDIUM', context
             );
         }
 
@@ -94,7 +101,7 @@ class RemediationDecisionEngine {
         const specificDecision = this._classifyByResourceType(finding, rawConfig, action, resourceType, context);
         if (specificDecision) return specificDecision;
 
-        // Stage 6: Default — CRITICAL/HIGH findings get auto-fixed, MEDIUM/LOW get suggested
+        // Stage 6: Default — CRITICAL/HIGH findings get auto-fixed, MEDIUM/LOW get MANUAL_REVIEW
         if (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') {
             return this._buildDecision('AUTO_FIX', action, finding,
                 `${finding.severity} severity finding with no detected intentional configuration. Safe to auto-fix.`,
@@ -102,7 +109,7 @@ class RemediationDecisionEngine {
             );
         }
 
-        return this._buildDecision('SUGGEST_FIX', action, finding,
+        return this._buildDecision('MANUAL_REVIEW', action, finding,
             `${finding.severity} severity finding. Review recommended before applying fix.`,
             0.8, 'LOW', context
         );
@@ -319,9 +326,9 @@ class RemediationDecisionEngine {
     }
 
     _getUIDisplay(decision, action, finding, reasoning) {
-        const icons = { AUTO_FIX: '🔧', SUGGEST_FIX: '⚠️', INTENTIONAL_SKIP: '✅' };
-        const colors = { AUTO_FIX: 'green', SUGGEST_FIX: 'orange', INTENTIONAL_SKIP: 'blue' };
-        const labels = { AUTO_FIX: 'Auto-Fix', SUGGEST_FIX: 'Manual Review', INTENTIONAL_SKIP: 'Intentional' };
+        const icons = { AUTO_FIX: '✨', ASSISTED_FIX: '🛠️', MANUAL_REVIEW: '👁️', INTENTIONAL_SKIP: '✅', SUGGEST_FIX: '⚠️' };
+        const colors = { AUTO_FIX: 'green', ASSISTED_FIX: 'blue', MANUAL_REVIEW: 'orange', INTENTIONAL_SKIP: 'gray', SUGGEST_FIX: 'orange' };
+        const labels = { AUTO_FIX: 'Auto-Fix', ASSISTED_FIX: 'Assisted Fix', MANUAL_REVIEW: 'Manual Review', INTENTIONAL_SKIP: 'Intentional', SUGGEST_FIX: 'Manual Review' };
 
         return {
             icon: icons[decision],
@@ -330,12 +337,14 @@ class RemediationDecisionEngine {
             badge: decision,
             action_text: decision === 'AUTO_FIX'
                 ? `Will automatically apply: ${action}`
-                : decision === 'SUGGEST_FIX'
-                    ? `Recommended: ${action} (requires approval)`
-                    : `Skipped: ${finding.title} — detected as intentional`,
+                : decision === 'ASSISTED_FIX' 
+                    ? `Guided Fix Available: ${finding.title}`
+                    : decision === 'MANUAL_REVIEW' || decision === 'SUGGEST_FIX'
+                        ? `Manual Action Required: ${finding.title}`
+                        : `Skipped: ${finding.title} — detected as intentional`,
             reasoning_text: reasoning,
-            show_approve_button: decision === 'SUGGEST_FIX',
-            show_dismiss_button: decision === 'SUGGEST_FIX',
+            show_approve_button: decision === 'MANUAL_REVIEW' || decision === 'SUGGEST_FIX',
+            show_dismiss_button: decision !== 'INTENTIONAL_SKIP',
             auto_execute: decision === 'AUTO_FIX'
         };
     }

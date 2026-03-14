@@ -60,7 +60,10 @@ exports.startCostScan = async (req, res) => {
                 region: credentials.region,
                 details: `${size} GB Available`,
                 estimated_monthly_cost: cost.toFixed(2),
-                status: "Zombie Resource"
+                status: "Zombie Resource",
+                remediation_mode: "MANUAL_REVIEW",
+                remediation_reason: "Deleting unattached storage requires confirmation that the data is no longer needed.",
+                auto_fix_available: false
             });
         });
 
@@ -104,7 +107,10 @@ exports.startCostScan = async (req, res) => {
                             region: credentials.region,
                             details: `Avg CPU: ${avgCpu.toFixed(2)}%`,
                             estimated_monthly_cost: estimateEC2Cost(inst.InstanceType).toFixed(2),
-                            status: "Idle Instance"
+                            status: "Idle Instance",
+                remediation_mode: "ASSISTED_FIX",
+                remediation_reason: "Stopping instances is generally safe but requires verifying there are no background jobs running.",
+                auto_fix_available: false
                         });
                     }
                 } else {

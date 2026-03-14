@@ -1,9 +1,9 @@
 import React from 'react';
-import { Server, HardDrive, DollarSign, Clock, ArrowRight, TrendingDown } from 'lucide-react';
+import { Server, HardDrive, DollarSign, Clock, ArrowRight, TrendingDown, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-const CostTable = ({ resources }) => {
+const CostTable = ({ resources, onDownload }) => {
     if (!resources || resources.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center py-20 px-4">
@@ -81,11 +81,12 @@ const CostTable = ({ resources }) => {
                             </td>
                             <td className="px-6 py-5 text-right pr-8">
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); }}
+                                    onClick={(e) => { e.stopPropagation(); if (onDownload) onDownload(resource.scanId, 'cost'); }}
                                     className="group/btn relative inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 hover:text-blue-300 transition-all active:scale-95"
+                                    title="Download Cost Report"
                                 >
-                                    Select
-                                    <ArrowRight className="w-3 h-3 transition-transform group-hover/btn:translate-x-0.5" />
+                                    <Download className="w-3.5 h-3.5" />
+                                    Report
                                 </button>
                             </td>
                         </motion.tr>

@@ -1,6 +1,7 @@
 const decisionEngine = require('./remediation-decision-engine');
 const impactAnalyzer = require('./impact-analyzer');
 const riskScorer = require('../../scan-pipeline/agents/risk-scorer.agent');
+const assistedFixGenerator = require('./assisted-fix.agent');
 
 class RemediationPlannerAgent {
 
@@ -67,6 +68,9 @@ class RemediationPlannerAgent {
             },
         ];
 
+        const processedRuleIds = new Set();
+        const region = rawConfig.region || 'us-east-1';
+
         for (const mapping of actionMappings) {
             if (!mapping.check()) continue;
 
@@ -84,6 +88,12 @@ class RemediationPlannerAgent {
                 resourceType: 'S3'
             });
 
+            processedRuleIds.add(finding.rule_id);
+            let assistedFix = null;
+            if (decision.decision === 'ASSISTED_FIX') {
+               assistedFix = assistedFixGenerator.generateForFinding(finding.rule_id, scanResult.bucket, region);
+            }
+
             steps.push({
                 action: mapping.action,
                 description: mapping.description,
@@ -94,7 +104,39 @@ class RemediationPlannerAgent {
                 reversible: decision.reversible,
                 rule_id: finding.rule_id,
                 severity: finding.severity,
-                ui_display: decision.ui_display
+                ui_display: decision.ui_display,
+                assisted_fix: assistedFix
+            });
+        }
+
+        // Process any remaining findings that don't have an automated action mapping
+        for (const finding of structuredFindings) {
+            if (processedRuleIds.has(finding.rule_id)) continue;
+            
+            const decision = decisionEngine.classify({
+                finding,
+                rawConfig,
+                action: 'MANUAL_REMEDIATION',
+                resourceType: 'S3'
+            });
+
+            let assistedFix = null;
+            if (decision.decision === 'ASSISTED_FIX') {
+               assistedFix = assistedFixGenerator.generateForFinding(finding.rule_id, scanResult.bucket, region);
+            }
+
+            steps.push({
+                action: 'MANUAL_REMEDIATION',
+                description: finding.title,
+                decision: decision.decision,
+                reasoning: decision.reasoning,
+                confidence: decision.confidence,
+                risk_of_change: decision.risk_of_change,
+                reversible: decision.reversible,
+                rule_id: finding.rule_id,
+                severity: finding.severity,
+                ui_display: decision.ui_display,
+                assisted_fix: assistedFix
             });
         }
 
@@ -186,6 +228,9 @@ class RemediationPlannerAgent {
             },
         ];
 
+        const processedRuleIds = new Set();
+        const region = rawConfig.region || 'us-east-1';
+
         for (const mapping of actionMappings) {
             if (!mapping.check()) continue;
 
@@ -203,6 +248,12 @@ class RemediationPlannerAgent {
                 resourceType: 'EC2'
             });
 
+            processedRuleIds.add(finding.rule_id);
+            let assistedFix = null;
+            if (decision.decision === 'ASSISTED_FIX') {
+               assistedFix = assistedFixGenerator.generateForFinding(finding.rule_id, instanceId, region);
+            }
+
             steps.push({
                 action: mapping.action,
                 description: mapping.description,
@@ -213,7 +264,39 @@ class RemediationPlannerAgent {
                 reversible: decision.reversible,
                 rule_id: finding.rule_id,
                 severity: finding.severity,
-                ui_display: decision.ui_display
+                ui_display: decision.ui_display,
+                assisted_fix: assistedFix
+            });
+        }
+        
+        // Process any remaining findings that don't have an automated action mapping
+        for (const finding of structuredFindings) {
+            if (processedRuleIds.has(finding.rule_id)) continue;
+            
+            const decision = decisionEngine.classify({
+                finding,
+                rawConfig,
+                action: 'MANUAL_REMEDIATION',
+                resourceType: 'EC2'
+            });
+
+            let assistedFix = null;
+            if (decision.decision === 'ASSISTED_FIX') {
+               assistedFix = assistedFixGenerator.generateForFinding(finding.rule_id, instanceId, region);
+            }
+
+            steps.push({
+                action: 'MANUAL_REMEDIATION',
+                description: finding.title,
+                decision: decision.decision,
+                reasoning: decision.reasoning,
+                confidence: decision.confidence,
+                risk_of_change: decision.risk_of_change,
+                reversible: decision.reversible,
+                rule_id: finding.rule_id,
+                severity: finding.severity,
+                ui_display: decision.ui_display,
+                assisted_fix: assistedFix
             });
         }
 

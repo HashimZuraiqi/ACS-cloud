@@ -265,6 +265,23 @@ const Dashboard = () => {
     }
   };
 
+  const handleDownloadReport = async (scanId, type) => {
+    try {
+      const blob = await api.downloadResourceReport(scanId, type);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cloudguard-security-report-${type}-${scanId.substring(0,8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Report Downloaded", description: "Security report saved as PDF", variant: "success" });
+    } catch (err) {
+      toast({ title: "Download Failed", description: err.message || "Failed to download report", variant: "destructive" });
+    }
+  };
+
   const currentData = serviceData[activeService];
   const currentLoading = serviceLoading[activeService];
   const currentError = serviceError[activeService];
@@ -423,13 +440,13 @@ const Dashboard = () => {
                   transition={{ duration: 0.2 }}
                 >
                   {activeService === 's3' ? (
-                    <BucketTable buckets={serviceData.s3} />
+                    <BucketTable buckets={serviceData.s3} onDownload={handleDownloadReport} />
                   ) : activeService === 'ec2' ? (
-                    <InstanceTable instances={serviceData.ec2} />
+                    <InstanceTable instances={serviceData.ec2} onDownload={handleDownloadReport} />
                   ) : activeService === 'iam' ? (
-                    <IAMTable users={serviceData.iam} />
+                    <IAMTable users={serviceData.iam} onDownload={handleDownloadReport} />
                   ) : (
-                    <CostTable resources={serviceData.cost} />
+                    <CostTable resources={serviceData.cost} onDownload={handleDownloadReport} />
                   )}
                 </motion.div>
               </AnimatePresence>
