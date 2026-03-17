@@ -35,13 +35,17 @@ const RemediationPlan = ({ actions, planStatus, className }) => {
         {['MANUAL_REVIEW_ONLY', 'ASSISTED_FIX_ONLY', 'BLOCKED'].includes(planStatus) && (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <p className="text-sm text-amber-400 font-medium whitespace-pre-line">
-              Remaining items require manual review. Automatic fixes have been applied.
+              All safe automated fixes have been applied. Remaining items require manual review.
             </p>
           </div>
         )}
 
         <div className="space-y-3">
-          {actions.map((action, index) => {
+          {[...actions].sort((a, b) => {
+            if (a.decision === 'AUTO_FIX' && b.decision !== 'AUTO_FIX') return -1;
+            if (a.decision !== 'AUTO_FIX' && b.decision === 'AUTO_FIX') return 1;
+            return 0;
+          }).map((action, index) => {
             const uniqueId = action.rule_id || `act-${index}`;
             const isExpanded = expandedActions.has(uniqueId); 
             const isCopied = copiedCommand === uniqueId; 

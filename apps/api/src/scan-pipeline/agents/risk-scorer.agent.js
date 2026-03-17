@@ -132,7 +132,16 @@ class RiskScorerAgent {
         if (findings.length === 0) return 0;
 
         // Base score is the absolute worst finding
-        const scores = findings.map(f => SEVERITY_SCORES[f.severity] || 50).sort((a, b) => b - a);
+        const scores = findings.map(f => {
+            let base = SEVERITY_SCORES[f.severity] || 50;
+            // Down-weight manual recommendations so they don't artificially inflate the base risk
+            if (f.remediationMode === 'MANUAL_REVIEW' || f.remediation_mode === 'MANUAL_REVIEW' ||
+                f.remediationMode === 'ASSISTED_FIX' || f.remediation_mode === 'ASSISTED_FIX' ||
+                f.remediationMode === 'MANUAL_RECOMMENDATION' || f.remediation_mode === 'MANUAL_RECOMMENDATION') {
+                base = base * 0.5;
+            }
+            return base;
+        }).sort((a, b) => b - a);
         const maxScore = scores[0];
 
         // Additive penalty for additional findings (10% of their base severity added on top)
