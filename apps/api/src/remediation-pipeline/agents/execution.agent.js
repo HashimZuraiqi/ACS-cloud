@@ -141,6 +141,8 @@ class ExecutionAgent {
                 return await this._enableLogging(bucketName, s3Client);
             case "ENABLE_LIFECYCLE":
                 return await this._enableLifecycle(bucketName, s3Client);
+            case "ENFORCE_HTTPS":
+                return await this._enforceHTTPS(bucketName, s3Client);
             default:
                 return { action: step.action, status: "SKIPPED", message: `Unknown action: ${step.action}` };
         }
@@ -406,6 +408,71 @@ class ExecutionAgent {
             message: "Applied safe default lifecycle policy (Standard-IA transition after 90 days)",
             before: { lifecycle: 'None' },
             after: { lifecycle: 'STANDARD_IA at 90 days, abort multipart at 7 days' }
+        };
+    }
+
+    async _enforceHTTPS(bucketName, s3Client) {
+        // Check if HTTPS deny statement already exists
+        let existingPolicy = null;
+        try {
+            const policyResponse = await s3Client.send(new GetBucketPolicyCommand({ Bucket: bucketName }));
+            existingPolicy = JSON.parse(policyResponse.Policy);
+
+            // Check if HTTPS enforcement already exists
+            const hasHTTPSDeny = existingPolicy.Statement.some(stmt =>
+                stmt.Effect === 'Deny' &&
+                stmt.Condition?.Bool?.['aws:SecureTransport'] === 'false'
+            );
+            if (hasHTTPSDeny) {
+                return {
+                    action: "ENFORCE_HTTPS",
+                    status: "ALREADY_COMPLIANT",
+                    message: "HTTPS-only Deny Policy Already Exists — Skipped"
+                };
+            }
+        } catch (err) {
+            if (err.name !== 'NoSuchBucketPolicy') {
+                throw err;
+            }
+            // No policy exists — we'll create one
+        }
+
+        const httpsDenyStatement = {
+            Sid: "CloudGuardEnforceHTTPS",
+            Effect: "Deny",
+            Principal: "*",
+            Action: "s3:*",
+            Resource: [
+                `arn:aws:s3:::${bucketName}`,
+                `arn:aws:s3:::${bucketName}/*`
+            ],
+            Condition: {
+                Bool: {
+                    "aws:SecureTransport": "false"
+                }
+            }
+        };
+
+        if (existingPolicy) {
+            existingPolicy.Statement.push(httpsDenyStatement);
+        } else {
+            existingPolicy = {
+                Version: "2012-10-17",
+                Statement: [httpsDenyStatement]
+            };
+        }
+
+        await s3Client.send(new PutBucketPolicyCommand({
+            Bucket: bucketName,
+            Policy: JSON.stringify(existingPolicy)
+        }));
+
+        return {
+            action: "ENFORCE_HTTPS",
+            status: "SUCCESS",
+            message: "Added HTTPS-only deny policy (aws:SecureTransport=false)",
+            before: { https_enforcement: 'None' },
+            after: { https_enforcement: 'Deny non-HTTPS requests' }
         };
     }
 }
